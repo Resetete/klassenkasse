@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="de" data-theme="minimal">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Klassenkasse — Familienkonten</title>
+  <meta name="description" content="Klassenkasse: Familien anlegen, Einzahlungen & Klassen-Ausgaben verteilen, Salden & E-Mail Texte generieren. Lokal im Browser." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar__title">
+        <h1 data-i18n="appTitle">Klassenkasse</h1>
+        <p class="sub" data-i18n="appSubtitle">Familienkonten, Einzahlungen, Klassen-Ausgaben verteilen, Salden & E-Mail Texte.</p>
+      </div>
+
+      <div class="topbar__controls">
+        <div class="seg">
+          <label class="seg__label" for="lang" data-i18n="languageLabel">Sprache</label>
+          <select id="lang" class="seg__select">
+            <option value="de">DE</option>
+            <option value="en">EN</option>
+          </select>
+        </div>
+
+        <div class="seg">
+          <label class="seg__label" for="theme" data-i18n="themeLabel">Theme</label>
+          <select id="theme" class="seg__select">
+            <option value="minimal">Minimal</option>
+            <option value="paper">Paper</option>
+          </select>
+        </div>
+
+        <button class="btn" id="reminderBtn" type="button" data-i18n="reminderBtn">Reminders</button>
+        <button class="btn" id="exportBtn" type="button" data-i18n="exportBtn">Export</button>
+
+        <label class="btn btn--file">
+          <input id="importInput" type="file" accept="application/json" />
+          <span data-i18n="importBtn">Import</span>
+        </label>
+
+        <button class="btn btn--danger" id="resetBtn" type="button" data-i18n="resetBtn">Reset</button>
+      </div>
+    </header>
+
+    <main class="grid">
+      <!-- Left column -->
+      <section class="card">
+        <h2 data-i18n="summaryTitle">Übersicht</h2>
+
+        <div class="summary">
+          <div class="summary__item">
+            <div class="summary__label" data-i18n="totalBalanceLabel">Gesamtsaldo</div>
+            <div class="summary__value" id="totalBalance">0,00 €</div>
+          </div>
+          <div class="summary__item">
+            <div class="summary__label" data-i18n="familiesCountLabel">Familien</div>
+            <div class="summary__value" id="familiesCount">0</div>
+          </div>
+          <div class="summary__item">
+            <div class="summary__label" data-i18n="txCountLabel">Buchungen</div>
+            <div class="summary__value" id="txCount">0</div>
+          </div>
+        </div>
+
+        <hr class="hr" />
+
+        <h2 data-i18n="settingsTitle">Einstellungen</h2>
+        <div class="field">
+          <label for="targetAmount" data-i18n="targetAmountLabel">Zielbetrag pro Familie (€)</label>
+          <input id="targetAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="z. B. 10.00" />
+        </div>
+        <p class="hint" data-i18n="targetHint">
+          Wenn gesetzt: Jede Familie sollte mindestens diesen Saldo haben. Unter Ziel wird „Fehlt noch …“ angezeigt.
+        </p>
+
+        <hr class="hr" />
+
+        <h2 data-i18n="addFamilyTitle">Familie hinzufügen</h2>
+
+        <div class="field">
+          <label for="parent1" data-i18n="parent1Label">Elternteil 1</label>
+          <input id="parent1" type="text" maxlength="60" placeholder="z. B. Maria Muster" />
+        </div>
+
+        <div class="field">
+          <label for="parent2" data-i18n="parent2Label">Elternteil 2 (optional)</label>
+          <input id="parent2" type="text" maxlength="60" placeholder="z. B. Alex Muster" />
+        </div>
+
+        <div class="field">
+          <label for="email" data-i18n="emailLabel">E-Mail</label>
+          <input id="email" type="email" maxlength="120" placeholder="maria@example.com" />
+        </div>
+
+        <div class="field">
+          <label for="children" data-i18n="childrenLabel">Kinder (Komma-getrennt)</label>
+          <input id="children" type="text" maxlength="120" placeholder="z. B. Emma, Liam" />
+        </div>
+
+        <button class="btn btn--primary" id="addFamilyBtn" type="button" data-i18n="addFamilyBtn">Hinzufügen</button>
+
+        <p class="hint" data-i18n="familyHint">
+          Tipp: Inaktive Familien werden bei Klassen-Ausgaben nicht mehr vorgeschlagen, bleiben aber im Verlauf.
+        </p>
+
+        <hr class="hr" />
+
+        <h2 data-i18n="depositTitle">Einzahlung</h2>
+
+        <div class="field">
+          <label for="depositFamily" data-i18n="familyLabel">Familie</label>
+          <select id="depositFamily"></select>
+        </div>
+
+        <div class="field">
+          <label for="depositAmount" data-i18n="amountLabel">Betrag (€)</label>
+          <input id="depositAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="z. B. 10.00" />
+        </div>
+
+        <div class="field">
+          <label for="depositDate" data-i18n="dateLabel">Datum</label>
+          <input id="depositDate" type="date" />
+        </div>
+
+        <div class="field">
+          <label for="depositNote" data-i18n="noteLabel">Notiz (optional)</label>
+          <input id="depositNote" type="text" maxlength="120" placeholder="z. B. September" />
+        </div>
+
+        <button class="btn btn--primary" id="addDepositBtn" type="button" data-i18n="addDepositBtn">Einzahlung buchen</button>
+
+        <hr class="hr" />
+
+        <h2 data-i18n="classExpenseTitle">Klassen-Ausgabe verteilen</h2>
+
+        <div class="field">
+          <label for="expenseTitle" data-i18n="expenseTitleLabel">Titel</label>
+          <input id="expenseTitle" type="text" maxlength="80" placeholder="z. B. Bastelmaterial" />
+        </div>
+
+        <div class="field">
+          <label for="expenseAmount" data-i18n="totalAmountLabel">Gesamtbetrag (€)</label>
+          <input id="expenseAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="z. B. 24.90" />
+        </div>
+
+        <div class="field">
+          <label for="expenseDate" data-i18n="dateLabel">Datum</label>
+          <input id="expenseDate" type="date" />
+        </div>
+
+        <div class="field">
+          <label data-i18n="expenseWhoLabel">Wer trägt die Ausgabe?</label>
+          <div class="row2">
+            <label class="radio">
+              <input type="radio" name="expenseWho" value="all" checked />
+              <span data-i18n="expenseAllActive">Alle aktiven Familien</span>
+            </label>
+            <label class="radio">
+              <input type="radio" name="expenseWho" value="selected" />
+              <span data-i18n="expenseSelected">Ausgewählte Familien</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field" id="expenseSelectedWrap" hidden>
+          <label data-i18n="expenseSelectLabel">Auswahl</label>
+          <div id="expenseFamilyChecklist" class="checklist"></div>
+        </div>
+
+        <button class="btn btn--primary" id="addExpenseBtn" type="button" data-i18n="addExpenseBtn">Ausgabe aufteilen</button>
+
+        <p class="hint" data-i18n="roundingHint">
+          Hinweis: Bei Cent-Rundung wird der Rest fair verteilt und im Verlauf sichtbar.
+        </p>
+      </section>
+
+      <!-- Right column -->
+      <section class="card">
+        <div class="listHeader">
+          <h2 data-i18n="familiesTitle">Familien</h2>
+          <div class="listHeader__right">
+            <input id="search" type="search" placeholder="Suchen…" />
+            <select id="statusFilter" class="seg__select">
+              <option value="active" data-i18n="filterActive">Aktiv</option>
+              <option value="all" data-i18n="filterAll">Alle</option>
+              <option value="inactive" data-i18n="filterInactive">Inaktiv</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="familiesList" class="families"></div>
+
+        <hr class="hr" />
+
+        <div class="listHeader">
+          <h2 data-i18n="ledgerTitle">Verlauf</h2>
+          <div class="listHeader__right">
+            <select id="ledgerFilter" class="seg__select">
+              <option value="all" data-i18n="ledgerAll">Alle</option>
+              <option value="deposit" data-i18n="ledgerDeposits">Einzahlungen</option>
+              <option value="expense" data-i18n="ledgerExpenses">Ausgaben</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="ledger" class="ledger"></div>
+
+        <p class="empty muted" id="emptyState" hidden data-i18n="emptyState">
+          Noch keine Buchungen — füge links die erste hinzu.
+        </p>
+      </section>
+    </main>
+
+    <!-- Export modal -->
+    <dialog id="exportDialog" class="dialog">
+      <div class="dialog__head">
+        <strong data-i18n="exportTitle">Export</strong>
+        <button class="btn btn--icon" id="closeExport" type="button" aria-label="Close">✕</button>
+      </div>
+      <p class="muted" data-i18n="exportHelp">Kopiere dieses JSON oder lade es als Datei herunter.</p>
+      <textarea id="exportText" class="exportText" rows="10" readonly></textarea>
+      <div class="dialog__actions">
+        <button class="btn" id="copyExport" type="button" data-i18n="copyBtn">Kopieren</button>
+        <button class="btn btn--primary" id="downloadExport" type="button" data-i18n="downloadBtn">Download .json</button>
+      </div>
+    </dialog>
+
+    <!-- Reset confirm -->
+    <dialog id="confirmDialog" class="dialog">
+      <div class="dialog__head">
+        <strong data-i18n="resetTitle">Wirklich zurücksetzen?</strong>
+        <button class="btn btn--icon" id="closeConfirm" type="button" aria-label="Close">✕</button>
+      </div>
+      <p class="muted" data-i18n="resetHelp">Alle Daten werden aus diesem Browser gelöscht. Exportiere vorher, wenn du ein Backup willst.</p>
+      <div class="dialog__actions">
+        <button class="btn" id="cancelReset" type="button" data-i18n="cancelBtn">Abbrechen</button>
+        <button class="btn btn--danger" id="confirmReset" type="button" data-i18n="confirmBtn">Zurücksetzen</button>
+      </div>
+    </dialog>
+
+    <!-- Email modal -->
+    <dialog id="emailDialog" class="dialog dialog--wide">
+      <div class="dialog__head">
+        <strong data-i18n="emailTitle">E-Mail erstellen</strong>
+        <button class="btn btn--icon" id="closeEmail" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <div class="emailGrid">
+        <div class="emailCol">
+          <div class="field">
+            <label for="emailSubject" data-i18n="emailSubjectLabel">Betreff</label>
+            <input id="emailSubject" type="text" maxlength="120" />
+          </div>
+
+          <div class="field">
+            <label for="emailTemplate" data-i18n="emailTemplateLabel">Template</label>
+            <textarea id="emailTemplate" rows="10"></textarea>
+          </div>
+
+          <p class="hint" data-i18n="emailPlaceholdersHint">
+            Platzhalter: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}
+          </p>
+
+          <div class="dialog__actions">
+            <button class="btn" id="copyEmail" type="button" data-i18n="copyBtn">Kopieren</button>
+            <button class="btn btn--primary" id="openMailto" type="button" data-i18n="openMailBtn">Mail-App öffnen</button>
+          </div>
+        </div>
+
+        <div class="emailCol">
+          <div class="field">
+            <label data-i18n="emailPreviewLabel">Vorschau</label>
+            <pre id="emailPreview" class="preview"></pre>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- Reminder batch modal -->
+    <dialog id="reminderDialog" class="dialog dialog--wide">
+      <div class="dialog__head">
+        <strong data-i18n="reminderTitle">Reminder-Batch</strong>
+        <button class="btn btn--icon" id="closeReminder" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <div class="reminderTop">
+        <div class="seg">
+          <label class="seg__label" for="reminderMode" data-i18n="reminderModeLabel">Kriterium</label>
+          <select id="reminderMode" class="seg__select">
+            <option value="below_target" data-i18n="reminderBelowTarget">Unter Ziel</option>
+            <option value="negative_only" data-i18n="reminderNegativeOnly">Nur negativ</option>
+          </select>
+        </div>
+
+        <label class="toggle">
+          <input id="reminderActiveOnly" type="checkbox" checked />
+          <span data-i18n="reminderActiveOnly">Nur aktive Familien</span>
+        </label>
+      </div>
+
+      <div class="emailGrid">
+        <div class="emailCol">
+          <div class="field">
+            <label for="reminderSubject" data-i18n="emailSubjectLabel">Betreff</label>
+            <input id="reminderSubject" type="text" maxlength="120" />
+          </div>
+
+          <div class="field">
+            <label for="reminderTemplate" data-i18n="emailTemplateLabel">Template</label>
+            <textarea id="reminderTemplate" rows="10"></textarea>
+          </div>
+
+          <p class="hint" data-i18n="reminderHint">
+            Platzhalter: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}
+          </p>
+
+          <div class="dialog__actions">
+            <button class="btn" id="copyAllReminders" type="button" data-i18n="copyAllBtn">Alle kopieren</button>
+            <button class="btn btn--primary" id="openNextReminder" type="button" data-i18n="openNextBtn">Nächste Mail öffnen</button>
+          </div>
+
+          <div class="muted small" id="reminderCount"></div>
+        </div>
+
+        <div class="emailCol">
+          <div class="field">
+            <label data-i18n="reminderListLabel">Empfänger</label>
+            <div id="reminderList" class="reminderList"></div>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- Family report modal -->
+    <dialog id="reportDialog" class="dialog dialog--wide">
+      <div class="dialog__head">
+        <strong data-i18n="reportTitle">Übersicht</strong>
+        <button class="btn btn--icon" id="closeReport" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <div id="reportContent" class="report"></div>
+
+      <div class="dialog__actions">
+        <button class="btn" id="copyReport" type="button" data-i18n="copyBtn">Kopieren</button>
+        <button class="btn btn--primary" id="printReport" type="button" data-i18n="printBtn">Drucken / PDF</button>
+      </div>
+    </dialog>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
