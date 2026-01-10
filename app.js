@@ -83,10 +83,30 @@ const I18N = {
     reminderBelowTarget: "Unter Ziel",
     reminderNegativeOnly: "Nur negativ",
     reminderActiveOnly: "Nur aktive Familien",
-    reminderHint: "Platzhalter: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
+    reminderHint: "Platzhalter: {{parents}},_bp{{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
     reminderListLabel: "Empfänger",
     copyAllBtn: "Alle kopieren",
     openNextBtn: "Nächste Mail öffnen",
+
+    // placeholders (used by data-i18n-placeholder)
+    phParent1: "z. B. Maria Muster",
+    phParent2: "z. B. Alex Muster",
+    phEmail: "maria@example.com",
+    phChildren: "z. B. Emma, Liam",
+    phDepositAmount: "z. B. 10.00",
+    phDepositNote: "z. B. September",
+    phExpenseTitle: "z. B. Bastelmaterial",
+    phExpenseAmount: "z. B. 24.90",
+    phSearch: "Suchen…",
+    phTargetAmount: "z. B. 10.00",
+
+    // misc labels used in places that were hardcoded
+    labelsExtra: {
+      type: "Typ",
+      inactiveSuffix: "inaktiv",
+      openEmail: "Mail öffnen",
+      copyText: "Text kopieren",
+    },
 
     actions: {
       deactivate: "Inaktiv",
@@ -157,7 +177,7 @@ Viele Grüße
 
   en: {
     appTitle: "Class Fund",
-    appSubtitle: "Family accounts, deposits, split class expenses, balances & email text.",
+    appSubtitle: "Family accounts, contributions, split class expenses, balances & email texts.",
     languageLabel: "Language",
     themeLabel: "Theme",
     exportBtn: "Export",
@@ -165,7 +185,7 @@ Viele Grüße
     resetBtn: "Reset",
     reminderBtn: "Reminders",
 
-    summaryTitle: "Summary",
+    summaryTitle: "Overview",
     totalBalanceLabel: "Total balance",
     familiesCountLabel: "Families",
     txCountLabel: "Transactions",
@@ -180,14 +200,14 @@ Viele Grüße
     emailLabel: "Email",
     childrenLabel: "Children (comma-separated)",
     addFamilyBtn: "Add",
-    familyHint: "Tip: Inactive families are excluded from class-expense selection, but remain in history.",
+    familyHint: "Tip: inactive families are excluded from class-expense selection, but remain in history.",
 
-    depositTitle: "Deposit",
+    depositTitle: "Contribution",
     familyLabel: "Family",
     amountLabel: "Amount (€)",
     dateLabel: "Date",
     noteLabel: "Note (optional)",
-    addDepositBtn: "Add deposit",
+    addDepositBtn: "Add contribution",
 
     classExpenseTitle: "Split class expense",
     expenseTitleLabel: "Title",
@@ -204,9 +224,9 @@ Viele Grüße
     filterAll: "All",
     filterInactive: "Inactive",
 
-    ledgerTitle: "Ledger",
+    ledgerTitle: "History",
     ledgerAll: "All",
-    ledgerDeposits: "Deposits",
+    ledgerDeposits: "Contributions",
     ledgerExpenses: "Expenses",
     emptyState: "No transactions yet — add your first one on the left.",
 
@@ -227,7 +247,7 @@ Viele Grüße
     openMailBtn: "Open mail app",
     emailPlaceholdersHint: "Placeholders: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
 
-    reportTitle: "Summary",
+    reportTitle: "Overview",
     printBtn: "Print / PDF",
 
     reminderTitle: "Reminder batch",
@@ -240,19 +260,39 @@ Viele Grüße
     copyAllBtn: "Copy all",
     openNextBtn: "Open next email",
 
+    // placeholders (used by data-i18n-placeholder)
+    phParent1: "e.g. Maria Example",
+    phParent2: "e.g. Alex Example",
+    phEmail: "maria@example.com",
+    phChildren: "e.g. Emma, Liam",
+    phDepositAmount: "e.g. 10.00",
+    phDepositNote: "e.g. September",
+    phExpenseTitle: "e.g. craft supplies",
+    phExpenseAmount: "e.g. 24.90",
+    phSearch: "Search…",
+    phTargetAmount: "e.g. 10.00",
+
+    // misc labels used in places that were hardcoded
+    labelsExtra: {
+      type: "Type",
+      inactiveSuffix: "inactive",
+      openEmail: "Open email",
+      copyText: "Copy text",
+    },
+
     actions: {
       deactivate: "Deactivate",
       activate: "Activate",
       edit: "Edit",
       delete: "Delete",
       email: "Email",
-      report: "Summary",
+      report: "Overview",
     },
 
     labels: {
       active: "Active",
       inactive: "Inactive",
-      deposit: "Deposit",
+      deposit: "Contribution",
       expense: "Expense",
       splitAcross: "split across",
       families: "family(ies)",
@@ -308,7 +348,7 @@ Best regards
   },
 };
 
-function dict(){ return I18N[state.lang] || I18N.de; }
+function dict(){ return I18N[state.lang] || I18N.en; }
 
 /** ---------- utils ---------- **/
 function uid(){
@@ -358,7 +398,7 @@ function setTheme(theme){
 function defaultState(){
   return {
     version: 11, // v1.1
-    lang: "de",
+    lang: "en",
     theme: "minimal",
     targetCents: 0, // 0 => disabled
     families: [],
@@ -602,32 +642,53 @@ function applyI18n(){
   const d = dict();
   document.documentElement.lang = state.lang;
 
+  // Text nodes
   document.querySelectorAll("[data-i18n]").forEach(el => {
     const key = el.getAttribute("data-i18n");
-    if (d[key]) el.textContent = d[key];
+    if (d[key] != null) el.textContent = d[key];
   });
 
-  els.parent1.placeholder = state.lang === "de" ? "z. B. Maria Muster" : "e.g. Maria Example";
-  els.parent2.placeholder = state.lang === "de" ? "z. B. Alex Muster" : "e.g. Alex Example";
-  els.email.placeholder = "maria@example.com";
-  els.children.placeholder = state.lang === "de" ? "z. B. Emma, Liam" : "e.g. Emma, Liam";
-  els.depositAmount.placeholder = state.lang === "de" ? "z. B. 10.00" : "e.g. 10.00";
-  els.depositNote.placeholder = state.lang === "de" ? "z. B. September" : "e.g. September";
-  els.expenseTitle.placeholder = state.lang === "de" ? "z. B. Bastelmaterial" : "e.g. craft supplies";
-  els.expenseAmount.placeholder = state.lang === "de" ? "z. B. 24.90" : "e.g. 24.90";
-  els.search.placeholder = state.lang === "de" ? "Suchen…" : "Search…";
-  els.targetAmount.placeholder = state.lang === "de" ? "z. B. 10.00" : "e.g. 10.00";
+  // placeholders via attributes (matches updated HTML)
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+    const key = el.getAttribute("data-i18n-placeholder");
+    if (d[key] != null) el.setAttribute("placeholder", d[key]);
+  });
+
+  // Backwards compatible (if any placeholders remain without data-i18n-placeholder)
+  if (els.parent1 && !els.parent1.hasAttribute("data-i18n-placeholder")) els.parent1.placeholder = d.phParent1 || "";
+  if (els.parent2 && !els.parent2.hasAttribute("data-i18n-placeholder")) els.parent2.placeholder = d.phParent2 || "";
+  if (els.email && !els.email.hasAttribute("data-i18n-placeholder")) els.email.placeholder = d.phEmail || "maria@example.com";
+  if (els.children && !els.children.hasAttribute("data-i18n-placeholder")) els.children.placeholder = d.phChildren || "";
+  if (els.depositAmount && !els.depositAmount.hasAttribute("data-i18n-placeholder")) els.depositAmount.placeholder = d.phDepositAmount || "";
+  if (els.depositNote && !els.depositNote.hasAttribute("data-i18n-placeholder")) els.depositNote.placeholder = d.phDepositNote || "";
+  if (els.expenseTitle && !els.expenseTitle.hasAttribute("data-i18n-placeholder")) els.expenseTitle.placeholder = d.phExpenseTitle || "";
+  if (els.expenseAmount && !els.expenseAmount.hasAttribute("data-i18n-placeholder")) els.expenseAmount.placeholder = d.phExpenseAmount || "";
+  if (els.search && !els.search.hasAttribute("data-i18n-placeholder")) els.search.placeholder = d.phSearch || "";
+  if (els.targetAmount && !els.targetAmount.hasAttribute("data-i18n-placeholder")) els.targetAmount.placeholder = d.phTargetAmount || "";
+}
+
+/**
+ * Controls EN/DE visibility for SEO + FAQ sections.
+ * Requires the HTML to wrap each language block with: <div data-lang="en"> ... </div> / <div data-lang="de"> ... </div>
+ */
+function applyLangVisibility(){
+  document.querySelectorAll("[data-lang]").forEach(el => {
+    const lang = el.getAttribute("data-lang");
+    el.hidden = (lang !== state.lang);
+  });
 }
 
 /** ---------- render pickers/checklist ---------- **/
 function renderFamilyPickers(){
+  const d = dict();
   const familiesSorted = state.families.slice().sort((a,b)=>familyDisplayName(a).localeCompare(familyDisplayName(b)));
 
   els.depositFamily.innerHTML = "";
   for (const f of familiesSorted) {
     const opt = document.createElement("option");
     opt.value = f.id;
-    opt.textContent = `${familyDisplayName(f)}${f.active ? "" : " (inactive)"}`;
+    const inactiveSuffix = d.labelsExtra?.inactiveSuffix || (state.lang === "de" ? "inaktiv" : "inactive");
+    opt.textContent = `${familyDisplayName(f)}${f.active ? "" : ` (${inactiveSuffix})`}`;
     els.depositFamily.appendChild(opt);
   }
 
@@ -1118,8 +1179,8 @@ function fillTemplatePlaceholders(template, f, balanceCents){
   const parents = familyDisplayName(f);
   const kids = childrenText(f) || "—";
   const balance = formatEUR(balanceCents);
-  const target = state.targetCents > 0 ? formatEUR(state.targetCents) : (state.lang === "de" ? "—" : "—");
-  const due = state.targetCents > 0 ? formatEUR(dueCents(balanceCents)) : (state.lang === "de" ? "—" : "—");
+  const target = state.targetCents > 0 ? formatEUR(state.targetCents) : "—";
+  const due = state.targetCents > 0 ? formatEUR(dueCents(balanceCents)) : "—";
   const today = todayISO();
 
   return String(template || "")
@@ -1204,7 +1265,6 @@ let reminderQueue = []; // [{familyId, subject, body, email}]
 let reminderIndex = 0;
 
 function reminderEligibleFamilies(){
-  const d = dict();
   const { byFamily } = calcBalances();
 
   const mode = els.reminderMode.value || "below_target";
@@ -1249,7 +1309,6 @@ function buildReminderQueue(){
 
 function renderReminderList(){
   const list = reminderEligibleFamilies();
-  const { byFamily } = calcBalances();
   const d = dict();
 
   els.reminderList.innerHTML = "";
@@ -1318,13 +1377,13 @@ function renderReminderList(){
     const openBtn = document.createElement("button");
     openBtn.className = "btn btn--primary";
     openBtn.type = "button";
-    openBtn.textContent = state.lang === "de" ? "Mail öffnen" : "Open email";
+    openBtn.textContent = d.labelsExtra?.openEmail || (state.lang === "de" ? "Mail öffnen" : "Open email");
     openBtn.addEventListener("click", () => openReminderMailForFamily(f.id));
 
     const copyBtn = document.createElement("button");
     copyBtn.className = "btn";
     copyBtn.type = "button";
-    copyBtn.textContent = state.lang === "de" ? "Text kopieren" : "Copy text";
+    copyBtn.textContent = d.labelsExtra?.copyText || (state.lang === "de" ? "Text kopieren" : "Copy text");
     copyBtn.addEventListener("click", async () => {
       const subj = String(els.reminderSubject.value || "").trim() || dict().defaults.reminderSubject;
       const tmpl = String(els.reminderTemplate.value || "").trim() || dict().defaults.reminderTemplate;
@@ -1367,7 +1426,6 @@ function openReminderMailForFamily(familyId){
 }
 
 function copyAllReminderTexts(){
-  const d = dict();
   buildReminderQueue();
 
   if (reminderQueue.length === 0) {
@@ -1394,9 +1452,8 @@ function openNextReminderEmail(){
   buildReminderQueue();
   if (reminderQueue.length === 0) return;
 
-  // open current, then advance index
   const r = reminderQueue[Math.min(reminderIndex, reminderQueue.length - 1)];
-  reminderIndex = Math.min(reminderIndex + 1, reminderQueue.length); // stops at end
+  reminderIndex = Math.min(reminderIndex + 1, reminderQueue.length);
 
   const url = `mailto:${encodeURIComponent(r.email || "")}?subject=${encodeURIComponent(r.subject)}&body=${encodeURIComponent(r.body)}`;
   window.location.href = url;
@@ -1409,7 +1466,6 @@ function openReminderDialog(){
   els.reminderSubject.value = tmpl.subject || d.defaults.reminderSubject;
   els.reminderTemplate.value = tmpl.template || d.defaults.reminderTemplate;
 
-  // defaults
   if (!els.reminderMode.value) els.reminderMode.value = "below_target";
   if (typeof els.reminderActiveOnly.checked !== "boolean") els.reminderActiveOnly.checked = true;
 
@@ -1473,13 +1529,15 @@ function openReportForFamily(familyId){
     `;
   }).join("");
 
+  const typeLabel = d.labelsExtra?.type || (state.lang === "de" ? "Typ" : "Type");
+
   const table = `
     <div style="margin-top:12px;"></div>
     <table>
       <thead>
         <tr>
           <th>${d.labels.date}</th>
-          <th>Typ</th>
+          <th>${typeLabel}</th>
           <th>${d.labels.note}</th>
           <th style="text-align:right;">€</th>
           <th style="text-align:right;">${d.labels.balance}</th>
@@ -1514,11 +1572,11 @@ function copyReportText(){
   lines.push("");
   lines.push(state.lang==="de" ? "Buchungen:" : "Transactions:");
 
-  const rows = familyTxRows(reportFamilyId).slice().sort((a,b)=> (a.dateISO.localeCompare(b.dateISO) || a.createdAt - b.createdAt));
+  const rows = familyTxRows(reportFamilyId).slice().sort((a,b)=> (a.dateISO.localeCompare(b.dateISO) || a.createdAt - a.createdAt));
   let running = 0;
   for (const t of rows) {
     running += (t.centsSigned || 0);
-    const kind = t.type === "deposit" ? (state.lang==="de" ? "Einzahlung" : "Deposit") : (state.lang==="de" ? "Ausgabe" : "Expense");
+    const kind = t.type === "deposit" ? (state.lang==="de" ? "Einzahlung" : "Contribution") : (state.lang==="de" ? "Ausgabe" : "Expense");
     lines.push(`${t.dateISO} · ${kind} · ${formatEUR(t.centsSigned)} · ${t.note || "—"} · ${formatEUR(running)}`);
   }
 
@@ -1538,7 +1596,7 @@ function printReport(){
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Klassenkasse — Report</title>
+  <title>Class Fund — Report</title>
   <style>
     body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 18px; }
     h3{ margin: 0 0 6px; }
@@ -1588,7 +1646,6 @@ function importJsonFile(file){
       if (!Array.isArray(parsed.families) || !Array.isArray(parsed.tx) || !Array.isArray(parsed.expenses)) {
         throw new Error("bad format");
       }
-      // Merge into local storage by simply adopting parsed state (safe enough for v1.1)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
       state = loadState();
       renderAll();
@@ -1619,12 +1676,10 @@ function updateExpenseUI(){
 
 /** ---------- target setting ---------- **/
 function renderTargetInput(){
-  // show in euros
   els.targetAmount.value = state.targetCents ? String((state.targetCents / 100).toFixed(2)) : "";
 }
 function updateTargetFromInput(){
   const c = centsFromInput(els.targetAmount.value);
-  // allow 0/empty => disabled
   state.targetCents = c === null ? 0 : c;
   saveState();
   renderAll();
@@ -1633,6 +1688,7 @@ function updateTargetFromInput(){
 /** ---------- render all ---------- **/
 function renderAll(){
   applyI18n();
+  applyLangVisibility(); // ✅ this controls the SEO+FAQ blocks
 
   els.lang.value = state.lang;
   els.theme.value = state.theme;
@@ -1649,7 +1705,6 @@ function renderAll(){
   updateExpenseUI();
   updateEmailPreview();
 
-  // update reminder list if open
   if (els.reminderDialog?.open) renderReminderList();
 }
 
