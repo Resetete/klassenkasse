@@ -83,7 +83,7 @@ const I18N = {
     reminderBelowTarget: "Unter Ziel",
     reminderNegativeOnly: "Nur negativ",
     reminderActiveOnly: "Nur aktive Familien",
-    reminderHint: "Platzhalter: {{parents}},_bp{{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
+    reminderHint: "Platzhalter: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
     reminderListLabel: "Empfänger",
     copyAllBtn: "Alle kopieren",
     openNextBtn: "Nächste Mail öffnen",
@@ -348,7 +348,36 @@ Best regards
   },
 };
 
+const SUPPORTED_LANGS = ["de", "en"];
+function normalizeLang(lang) {
+  return SUPPORTED_LANGS.includes(lang) ? lang : "en";
+}
 function dict(){ return I18N[state.lang] || I18N.en; }
+
+/** ---------- language switcher helpers ---------- **/
+function setLang(lang) {
+  state.lang = normalizeLang(lang);
+  document.documentElement.lang = state.lang;
+  saveState();
+  renderAll();
+}
+
+/**
+ * Optional: update an explainer/SEO link depending on language.
+ * Requires: <a id="seoLink" ...> in your HTML (otherwise it does nothing).
+ * Adjust the paths if your filenames differ.
+ */
+function updateSeoLinkForLang(lang) {
+  const seoLink = document.getElementById("seoLink");
+  if (!seoLink) return;
+
+  const map = {
+    en: "/pages/en/class-fund-explainer.html",
+    de: "/pages/de/klassenkasse-erklaerung.html",
+  };
+
+  seoLink.setAttribute("href", map[lang] || map.en);
+}
 
 /** ---------- utils ---------- **/
 function uid(){
@@ -424,7 +453,7 @@ function loadState(){
     const parsed = JSON.parse(raw);
     const base = defaultState();
 
-    const okLang = ["de","en"].includes(parsed.lang) ? parsed.lang : base.lang;
+    const okLang = normalizeLang(parsed.lang);
     const okTheme = ["minimal","paper"].includes(parsed.theme) ? parsed.theme : base.theme;
     const targetCents = Number.isFinite(parsed.targetCents) && parsed.targetCents >= 0 ? parsed.targetCents : base.targetCents;
 
@@ -1688,7 +1717,8 @@ function updateTargetFromInput(){
 /** ---------- render all ---------- **/
 function renderAll(){
   applyI18n();
-  applyLangVisibility(); // ✅ this controls the SEO+FAQ blocks
+  updateSeoLinkForLang(state.lang); // language-aware explainer link (if #seoLink exists)
+  applyLangVisibility(); // controls SEO+FAQ blocks
 
   els.lang.value = state.lang;
   els.theme.value = state.theme;
@@ -1710,9 +1740,7 @@ function renderAll(){
 
 /** ---------- bindings ---------- **/
 els.lang.addEventListener("change", () => {
-  state.lang = els.lang.value;
-  saveState();
-  renderAll();
+  setLang(els.lang.value); // use the switcher
 });
 
 els.theme.addEventListener("change", () => {
@@ -1797,4 +1825,11 @@ els.copyReport.addEventListener("click", () => {
 els.printReport.addEventListener("click", printReport);
 
 /** ---------- init ---------- **/
+
+// Optional: URL override like ?lang=de or ?lang=en
+(function initLangFromUrl(){
+  const urlLang = new URLSearchParams(location.search).get("lang");
+  if (urlLang) state.lang = normalizeLang(urlLang);
+})();
+
 renderAll();

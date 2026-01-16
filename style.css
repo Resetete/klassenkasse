@@ -404,7 +404,8 @@ html[data-theme="paper"] .reminderList{
 /* --- SEO / FAQ sections --- */
 
 .seo-privacy,
-.seo-faq{
+.seo-faq,
+.seo-teaser{
   max-width: 1160px;
   margin: 18px auto 34px;
   padding: 16px 22px;
@@ -416,40 +417,46 @@ html[data-theme="paper"] .reminderList{
 }
 
 .seo-privacy h2,
-.seo-faq h2{
+.seo-faq h2,
+.seo-teaser h2{
   margin: 0 0 10px;
   font-size: 18px;
 }
 
 .seo-privacy p,
-.seo-faq p{
+.seo-faq p,
+.seo-teaser p{
   margin: 8px 0;
   color: var(--muted);
   line-height: 1.6;
   max-width: 92ch;
 }
 
-.seo-privacy hr{
+.seo-privacy hr,
+.seo-teaser hr{
   border: 0;
   border-top: 1px solid var(--stroke);
   margin: 14px 0;
   opacity: .9;
 }
 
-.seo-faq h3{
+.seo-faq h3,
+.seo-teaser h3{
   margin: 14px 0 6px;
   font-size: 14px;
   font-weight: 900;
   color: var(--text);
 }
 
-.seo-faq p{
+.seo-faq p,
+.seo-teaser p{
   margin: 0 0 10px;
 }
 
 @media (max-width: 980px){
   .seo-privacy,
-  .seo-faq{
+  .seo-faq,
+  .seo-teaser{
     padding: 14px;
     margin-left: 22px;
     margin-right: 22px;
