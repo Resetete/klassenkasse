@@ -1,4 +1,8 @@
-// Klassenkasse v1.1 (static): + target per family (global) + reminder batch modal
+// Klassenkasse v1.1+ (static): target per family (global) + reminder batch modal
+// + language-aware SEO link + EN/DE visibility blocks
+// + EDIT deposits + EDIT expenses
+// + Display name = children (supports multiple children / twins)
+
 const STORAGE_KEY = "klassenkasse_familien_v1";
 
 /** ---------- i18n ---------- **/
@@ -100,7 +104,6 @@ const I18N = {
     phSearch: "Suchen…",
     phTargetAmount: "z. B. 10.00",
 
-    // misc labels used in places that were hardcoded
     labelsExtra: {
       type: "Typ",
       inactiveSuffix: "inaktiv",
@@ -128,6 +131,7 @@ const I18N = {
       note: "Notiz",
       email: "E-Mail",
       children: "Kinder",
+      parents: "Eltern",
       balance: "Saldo",
       total: "Gesamt",
       due: "Fehlt noch",
@@ -260,7 +264,7 @@ Viele Grüße
     copyAllBtn: "Copy all",
     openNextBtn: "Open next email",
 
-    // placeholders (used by data-i18n-placeholder)
+    // placeholders
     phParent1: "e.g. Maria Example",
     phParent2: "e.g. Alex Example",
     phEmail: "maria@example.com",
@@ -272,7 +276,6 @@ Viele Grüße
     phSearch: "Search…",
     phTargetAmount: "e.g. 10.00",
 
-    // misc labels used in places that were hardcoded
     labelsExtra: {
       type: "Type",
       inactiveSuffix: "inactive",
@@ -300,6 +303,7 @@ Viele Grüße
       note: "Note",
       email: "Email",
       children: "Children",
+      parents: "Parents",
       balance: "Balance",
       total: "Total",
       due: "Due",
@@ -352,7 +356,10 @@ const SUPPORTED_LANGS = ["de", "en"];
 function normalizeLang(lang) {
   return SUPPORTED_LANGS.includes(lang) ? lang : "en";
 }
-function dict(){ return I18N[state.lang] || I18N.en; }
+
+function dict() {
+  return I18N[state.lang] || I18N.en;
+}
 
 /** ---------- language switcher helpers ---------- **/
 function setLang(lang) {
@@ -365,7 +372,6 @@ function setLang(lang) {
 /**
  * Optional: update an explainer/SEO link depending on language.
  * Requires: <a id="seoLink" ...> in your HTML (otherwise it does nothing).
- * Adjust the paths if your filenames differ.
  */
 function updateSeoLinkForLang(lang) {
   const seoLink = document.getElementById("seoLink");
@@ -380,53 +386,56 @@ function updateSeoLinkForLang(lang) {
 }
 
 /** ---------- utils ---------- **/
-function uid(){
+function uid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
-function todayISO(){
-  return new Date().toISOString().slice(0,10);
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
 }
-function isValidEmail(v){
+function isValidEmail(v) {
   const s = String(v || "").trim();
   if (!s) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
-function centsFromInput(v){
+function centsFromInput(v) {
   const n = Number(String(v).replace(",", "."));
   if (!Number.isFinite(n) || n < 0) return null;
   return Math.round(n * 100);
 }
-function centsFromPositiveInput(v){
+function centsFromPositiveInput(v) {
   const c = centsFromInput(v);
   if (c === null || c <= 0) return null;
   return c;
 }
-function formatEUR(cents){
+function formatEUR(cents) {
   const n = (cents || 0) / 100;
-  try{
-    return new Intl.NumberFormat(state.lang === "de" ? "de-DE" : "en-GB", { style:"currency", currency:"EUR" }).format(n);
-  }catch{
+  try {
+    return new Intl.NumberFormat(state.lang === "de" ? "de-DE" : "en-GB", {
+      style: "currency",
+      currency: "EUR",
+    }).format(n);
+  } catch {
     return `${n.toFixed(2)} €`;
   }
 }
-function openDialog(d){
+function openDialog(d) {
   if (!d) return;
   if (typeof d.showModal === "function") d.showModal();
-  else d.setAttribute("open","true");
+  else d.setAttribute("open", "true");
 }
-function closeDialog(d){
+function closeDialog(d) {
   if (!d) return;
   if (typeof d.close === "function") d.close();
   else d.removeAttribute("open");
 }
-function setTheme(theme){
+function setTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
 }
 
 /** ---------- state ---------- **/
-function defaultState(){
+function defaultState() {
   return {
-    version: 11, // v1.1
+    version: 11,
     lang: "en",
     theme: "minimal",
     targetCents: 0, // 0 => disabled
@@ -440,34 +449,37 @@ function defaultState(){
     reminderTemplateByLang: {
       de: { subject: I18N.de.defaults.reminderSubject, template: I18N.de.defaults.reminderTemplate },
       en: { subject: I18N.en.defaults.reminderSubject, template: I18N.en.defaults.reminderTemplate },
-    }
+    },
   };
 }
 
 let state = loadState();
 
-function loadState(){
-  try{
+function loadState() {
+  try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState();
     const parsed = JSON.parse(raw);
     const base = defaultState();
 
     const okLang = normalizeLang(parsed.lang);
-    const okTheme = ["minimal","paper"].includes(parsed.theme) ? parsed.theme : base.theme;
-    const targetCents = Number.isFinite(parsed.targetCents) && parsed.targetCents >= 0 ? parsed.targetCents : base.targetCents;
+    const okTheme = ["minimal", "paper"].includes(parsed.theme) ? parsed.theme : base.theme;
+    const targetCents =
+      Number.isFinite(parsed.targetCents) && parsed.targetCents >= 0 ? parsed.targetCents : base.targetCents;
 
     const families = Array.isArray(parsed.families) ? parsed.families : [];
     const tx = Array.isArray(parsed.tx) ? parsed.tx : [];
     const expenses = Array.isArray(parsed.expenses) ? parsed.expenses : [];
 
-    const emailTemplateByLang = (parsed.emailTemplateByLang && typeof parsed.emailTemplateByLang === "object")
-      ? parsed.emailTemplateByLang
-      : base.emailTemplateByLang;
+    const emailTemplateByLang =
+      parsed.emailTemplateByLang && typeof parsed.emailTemplateByLang === "object"
+        ? parsed.emailTemplateByLang
+        : base.emailTemplateByLang;
 
-    const reminderTemplateByLang = (parsed.reminderTemplateByLang && typeof parsed.reminderTemplateByLang === "object")
-      ? parsed.reminderTemplateByLang
-      : base.reminderTemplateByLang;
+    const reminderTemplateByLang =
+      parsed.reminderTemplateByLang && typeof parsed.reminderTemplateByLang === "object"
+        ? parsed.reminderTemplateByLang
+        : base.reminderTemplateByLang;
 
     return {
       ...base,
@@ -475,61 +487,87 @@ function loadState(){
       lang: okLang,
       theme: okTheme,
       targetCents,
-      families: families.map(f => ({
+      families: families.map((f) => ({
         id: f.id || uid(),
-        parent1: typeof f.parent1 === "string" ? f.parent1.slice(0,60) : "",
-        parent2: typeof f.parent2 === "string" ? f.parent2.slice(0,60) : "",
-        email: typeof f.email === "string" ? f.email.slice(0,120) : "",
-        children: Array.isArray(f.children) ? f.children.filter(Boolean).map(x => String(x).slice(0,60)) : [],
+        parent1: typeof f.parent1 === "string" ? f.parent1.slice(0, 60) : "",
+        parent2: typeof f.parent2 === "string" ? f.parent2.slice(0, 60) : "",
+        email: typeof f.email === "string" ? f.email.slice(0, 120) : "",
+        children: Array.isArray(f.children)
+          ? f.children.filter(Boolean).map((x) => String(x).slice(0, 60))
+          : [],
         active: typeof f.active === "boolean" ? f.active : true,
         createdAt: Number.isFinite(f.createdAt) ? f.createdAt : Date.now(),
       })),
-      tx: tx.map(t => ({
+      tx: tx.map((t) => ({
         id: t.id || uid(),
         type: t.type === "allocation" ? "allocation" : "deposit",
         familyId: typeof t.familyId === "string" ? t.familyId : "",
         centsSigned: Number.isFinite(t.centsSigned) ? t.centsSigned : 0,
         dateISO: typeof t.dateISO === "string" ? t.dateISO : todayISO(),
-        note: typeof t.note === "string" ? t.note.slice(0,120) : "",
+        note: typeof t.note === "string" ? t.note.slice(0, 120) : "",
         createdAt: Number.isFinite(t.createdAt) ? t.createdAt : Date.now(),
         expenseId: typeof t.expenseId === "string" ? t.expenseId : null,
       })),
-      expenses: expenses.map(e => ({
+      expenses: expenses.map((e) => ({
         id: e.id || uid(),
-        title: typeof e.title === "string" ? e.title.slice(0,80) : "",
+        title: typeof e.title === "string" ? e.title.slice(0, 80) : "",
         totalCents: Number.isFinite(e.totalCents) ? e.totalCents : 0,
         dateISO: typeof e.dateISO === "string" ? e.dateISO : todayISO(),
         participantIds: Array.isArray(e.participantIds) ? e.participantIds.filter(Boolean) : [],
-        perFamilyCentsMap: (e.perFamilyCentsMap && typeof e.perFamilyCentsMap === "object") ? e.perFamilyCentsMap : {},
+        perFamilyCentsMap: e.perFamilyCentsMap && typeof e.perFamilyCentsMap === "object" ? e.perFamilyCentsMap : {},
         createdAt: Number.isFinite(e.createdAt) ? e.createdAt : Date.now(),
       })),
       emailTemplateByLang: {
         de: {
-          subject: (emailTemplateByLang.de && typeof emailTemplateByLang.de.subject === "string") ? emailTemplateByLang.de.subject : base.emailTemplateByLang.de.subject,
-          template: (emailTemplateByLang.de && typeof emailTemplateByLang.de.template === "string") ? emailTemplateByLang.de.template : base.emailTemplateByLang.de.template,
+          subject:
+            emailTemplateByLang.de && typeof emailTemplateByLang.de.subject === "string"
+              ? emailTemplateByLang.de.subject
+              : base.emailTemplateByLang.de.subject,
+          template:
+            emailTemplateByLang.de && typeof emailTemplateByLang.de.template === "string"
+              ? emailTemplateByLang.de.template
+              : base.emailTemplateByLang.de.template,
         },
         en: {
-          subject: (emailTemplateByLang.en && typeof emailTemplateByLang.en.subject === "string") ? emailTemplateByLang.en.subject : base.emailTemplateByLang.en.subject,
-          template: (emailTemplateByLang.en && typeof emailTemplateByLang.en.template === "string") ? emailTemplateByLang.en.template : base.emailTemplateByLang.en.template,
-        }
+          subject:
+            emailTemplateByLang.en && typeof emailTemplateByLang.en.subject === "string"
+              ? emailTemplateByLang.en.subject
+              : base.emailTemplateByLang.en.subject,
+          template:
+            emailTemplateByLang.en && typeof emailTemplateByLang.en.template === "string"
+              ? emailTemplateByLang.en.template
+              : base.emailTemplateByLang.en.template,
+        },
       },
       reminderTemplateByLang: {
         de: {
-          subject: (reminderTemplateByLang.de && typeof reminderTemplateByLang.de.subject === "string") ? reminderTemplateByLang.de.subject : base.reminderTemplateByLang.de.subject,
-          template: (reminderTemplateByLang.de && typeof reminderTemplateByLang.de.template === "string") ? reminderTemplateByLang.de.template : base.reminderTemplateByLang.de.template,
+          subject:
+            reminderTemplateByLang.de && typeof reminderTemplateByLang.de.subject === "string"
+              ? reminderTemplateByLang.de.subject
+              : base.reminderTemplateByLang.de.subject,
+          template:
+            reminderTemplateByLang.de && typeof reminderTemplateByLang.de.template === "string"
+              ? reminderTemplateByLang.de.template
+              : base.reminderTemplateByLang.de.template,
         },
         en: {
-          subject: (reminderTemplateByLang.en && typeof reminderTemplateByLang.en.subject === "string") ? reminderTemplateByLang.en.subject : base.reminderTemplateByLang.en.subject,
-          template: (reminderTemplateByLang.en && typeof reminderTemplateByLang.en.template === "string") ? reminderTemplateByLang.en.template : base.reminderTemplateByLang.en.template,
-        }
-      }
+          subject:
+            reminderTemplateByLang.en && typeof reminderTemplateByLang.en.subject === "string"
+              ? reminderTemplateByLang.en.subject
+              : base.reminderTemplateByLang.en.subject,
+          template:
+            reminderTemplateByLang.en && typeof reminderTemplateByLang.en.template === "string"
+              ? reminderTemplateByLang.en.template
+              : base.reminderTemplateByLang.en.template,
+        },
+      },
     };
-  }catch{
+  } catch {
     return defaultState();
   }
 }
 
-function saveState(){
+function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
@@ -613,49 +651,77 @@ const els = {
 };
 
 /** ---------- derived helpers ---------- **/
-function familyDisplayName(f){
-  const p1 = (f.parent1 || "").trim();
-  const p2 = (f.parent2 || "").trim();
+function parseChildrenInput(v) {
+  const raw = String(v || "").trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 10);
+}
+
+function parentsText(f) {
+  const p1 = String(f?.parent1 || "").trim();
+  const p2 = String(f?.parent2 || "").trim();
   if (p1 && p2) return `${p1} & ${p2}`;
   return p1 || p2 || "—";
 }
-function childrenText(f){
+
+function childrenText(f) {
   return (f.children || []).join(", ");
 }
-function familyById(id){
-  return state.families.find(f => f.id === id) || null;
+
+/**
+ * Display name: child-first (supports multiple children / twins).
+ * Falls back to parents if no children are set.
+ */
+function familyDisplayName(f) {
+  const kids = (f.children || []).map((s) => String(s || "").trim()).filter(Boolean);
+
+  if (kids.length === 1) return kids[0];
+  if (kids.length === 2) return `${kids[0]} & ${kids[1]}`;
+  if (kids.length >= 3) return `${kids[0]}, ${kids[1]} +${kids.length - 2}`;
+
+  return parentsText(f);
 }
-function getActiveFamilies(){
-  return state.families.filter(f => f.active);
+
+function familyById(id) {
+  return state.families.find((f) => f.id === id) || null;
 }
-function calcBalances(){
-  const byFamily = new Map(state.families.map(f => [f.id, 0]));
+function getActiveFamilies() {
+  return state.families.filter((f) => f.active);
+}
+
+function calcBalances() {
+  const byFamily = new Map(state.families.map((f) => [f.id, 0]));
   let total = 0;
 
   for (const t of state.tx) {
     if (!t.familyId) continue;
     if (!byFamily.has(t.familyId)) continue;
     byFamily.set(t.familyId, byFamily.get(t.familyId) + (t.centsSigned || 0));
-    total += (t.centsSigned || 0);
+    total += t.centsSigned || 0;
   }
   return { byFamily, total };
 }
-function dueCents(balanceCents){
+
+function dueCents(balanceCents) {
   if (!state.targetCents || state.targetCents <= 0) return 0;
   return Math.max(0, state.targetCents - (balanceCents || 0));
 }
 
 /** Split total cents equally, distribute remainder cents fairly */
-function splitCents(totalCents, participantIds){
+function splitCents(totalCents, participantIds) {
   const n = participantIds.length;
   if (n <= 0) return {};
   const base = Math.floor(totalCents / n);
   let remainder = totalCents - base * n;
 
-  const sorted = participantIds.slice().sort((a,b) => {
+  const sorted = participantIds.slice().sort((a, b) => {
     const fa = familyById(a);
     const fb = familyById(b);
-    return (familyDisplayName(fa||{parent1:""})).localeCompare(familyDisplayName(fb||{parent1:""}));
+    return familyDisplayName(fa || {}).localeCompare(familyDisplayName(fb || {}));
   });
 
   const map = {};
@@ -667,50 +733,36 @@ function splitCents(totalCents, participantIds){
 }
 
 /** ---------- i18n apply ---------- **/
-function applyI18n(){
+function applyI18n() {
   const d = dict();
   document.documentElement.lang = state.lang;
 
-  // Text nodes
-  document.querySelectorAll("[data-i18n]").forEach(el => {
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
     const key = el.getAttribute("data-i18n");
     if (d[key] != null) el.textContent = d[key];
   });
 
-  // placeholders via attributes (matches updated HTML)
-  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
     const key = el.getAttribute("data-i18n-placeholder");
     if (d[key] != null) el.setAttribute("placeholder", d[key]);
   });
-
-  // Backwards compatible (if any placeholders remain without data-i18n-placeholder)
-  if (els.parent1 && !els.parent1.hasAttribute("data-i18n-placeholder")) els.parent1.placeholder = d.phParent1 || "";
-  if (els.parent2 && !els.parent2.hasAttribute("data-i18n-placeholder")) els.parent2.placeholder = d.phParent2 || "";
-  if (els.email && !els.email.hasAttribute("data-i18n-placeholder")) els.email.placeholder = d.phEmail || "maria@example.com";
-  if (els.children && !els.children.hasAttribute("data-i18n-placeholder")) els.children.placeholder = d.phChildren || "";
-  if (els.depositAmount && !els.depositAmount.hasAttribute("data-i18n-placeholder")) els.depositAmount.placeholder = d.phDepositAmount || "";
-  if (els.depositNote && !els.depositNote.hasAttribute("data-i18n-placeholder")) els.depositNote.placeholder = d.phDepositNote || "";
-  if (els.expenseTitle && !els.expenseTitle.hasAttribute("data-i18n-placeholder")) els.expenseTitle.placeholder = d.phExpenseTitle || "";
-  if (els.expenseAmount && !els.expenseAmount.hasAttribute("data-i18n-placeholder")) els.expenseAmount.placeholder = d.phExpenseAmount || "";
-  if (els.search && !els.search.hasAttribute("data-i18n-placeholder")) els.search.placeholder = d.phSearch || "";
-  if (els.targetAmount && !els.targetAmount.hasAttribute("data-i18n-placeholder")) els.targetAmount.placeholder = d.phTargetAmount || "";
 }
 
 /**
  * Controls EN/DE visibility for SEO + FAQ sections.
- * Requires the HTML to wrap each language block with: <div data-lang="en"> ... </div> / <div data-lang="de"> ... </div>
+ * Requires: <div data-lang="en">...</div> / <div data-lang="de">...</div>
  */
-function applyLangVisibility(){
-  document.querySelectorAll("[data-lang]").forEach(el => {
+function applyLangVisibility() {
+  document.querySelectorAll("[data-lang]").forEach((el) => {
     const lang = el.getAttribute("data-lang");
-    el.hidden = (lang !== state.lang);
+    el.hidden = lang !== state.lang;
   });
 }
 
 /** ---------- render pickers/checklist ---------- **/
-function renderFamilyPickers(){
+function renderFamilyPickers() {
   const d = dict();
-  const familiesSorted = state.families.slice().sort((a,b)=>familyDisplayName(a).localeCompare(familyDisplayName(b)));
+  const familiesSorted = state.families.slice().sort((a, b) => familyDisplayName(a).localeCompare(familyDisplayName(b)));
 
   els.depositFamily.innerHTML = "";
   for (const f of familiesSorted) {
@@ -724,8 +776,8 @@ function renderFamilyPickers(){
   renderExpenseChecklist();
 }
 
-function renderExpenseChecklist(){
-  const active = getActiveFamilies().slice().sort((a,b)=>familyDisplayName(a).localeCompare(familyDisplayName(b)));
+function renderExpenseChecklist() {
+  const active = getActiveFamilies().slice().sort((a, b) => familyDisplayName(a).localeCompare(familyDisplayName(b)));
   els.expenseFamilyChecklist.innerHTML = "";
 
   if (active.length === 0) {
@@ -753,7 +805,11 @@ function renderExpenseChecklist(){
 
     const s = document.createElement("div");
     s.className = "checkItem__sub";
-    s.textContent = `${f.email || "—"} · ${childrenText(f) || (state.lang==="de" ? "Kinder: —" : "Children: —")}`;
+    const kids = childrenText(f);
+    const parents = parentsText(f);
+    s.textContent = `${f.email || "—"} · ${kids || (state.lang === "de" ? "Kinder: —" : "Children: —")} · ${
+      parents ? (state.lang === "de" ? "Eltern: " : "Parents: ") + parents : ""
+    }`.trim();
 
     main.appendChild(t);
     main.appendChild(s);
@@ -766,7 +822,7 @@ function renderExpenseChecklist(){
 }
 
 /** ---------- render summary + families ---------- **/
-function renderSummary(){
+function renderSummary() {
   const { total } = calcBalances();
 
   els.totalBalance.textContent = formatEUR(total);
@@ -776,7 +832,7 @@ function renderSummary(){
   els.totalBalance.style.color = total < 0 ? "var(--neg)" : total > 0 ? "var(--pos)" : "var(--text)";
 }
 
-function renderFamilies(){
+function renderFamilies() {
   const d = dict();
   const q = (els.search.value || "").toLowerCase().trim();
   const status = els.statusFilter.value || "active";
@@ -784,21 +840,17 @@ function renderFamilies(){
   const { byFamily } = calcBalances();
 
   let families = state.families.slice();
-  if (status === "active") families = families.filter(f => f.active);
-  if (status === "inactive") families = families.filter(f => !f.active);
+  if (status === "active") families = families.filter((f) => f.active);
+  if (status === "inactive") families = families.filter((f) => !f.active);
 
   if (q) {
-    families = families.filter(f => {
-      const hay = [
-        familyDisplayName(f),
-        f.email || "",
-        childrenText(f),
-      ].join(" ").toLowerCase();
+    families = families.filter((f) => {
+      const hay = [familyDisplayName(f), parentsText(f), f.email || "", childrenText(f)].join(" ").toLowerCase();
       return hay.includes(q);
     });
   }
 
-  families.sort((a,b)=>familyDisplayName(a).localeCompare(familyDisplayName(b)));
+  families.sort((a, b) => familyDisplayName(a).localeCompare(familyDisplayName(b)));
 
   els.familiesList.innerHTML = "";
 
@@ -829,8 +881,17 @@ function renderFamilies(){
 
     const small = document.createElement("div");
     small.className = "familySmall";
+
+    // Show useful context (parents + email) in smaller line
     const kids = childrenText(f);
-    small.textContent = `${f.email || "—"}${kids ? " · " + kids : ""}`;
+    const parents = parentsText(f);
+    small.textContent = [
+      kids ? (state.lang === "de" ? "Kinder: " : "Children: ") + kids : null,
+      parents ? (state.lang === "de" ? "Eltern: " : "Parents: ") + parents : null,
+      f.email || null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
 
     const badges = document.createElement("div");
     badges.className = "badges";
@@ -918,7 +979,7 @@ function renderFamilies(){
 }
 
 /** ---------- render ledger ---------- **/
-function renderLedger(){
+function renderLedger() {
   const d = dict();
   const filter = els.ledgerFilter.value || "all";
 
@@ -930,9 +991,9 @@ function renderLedger(){
     items.push({ kind: "expense", dateISO: e.dateISO, createdAt: e.createdAt, expense: e });
   }
 
-  items.sort((a,b)=> (b.dateISO.localeCompare(a.dateISO) || b.createdAt - a.createdAt));
+  items.sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.createdAt - a.createdAt);
 
-  const visible = items.filter(it => {
+  const visible = items.filter((it) => {
     if (filter === "all") return true;
     if (filter === "deposit") return it.kind === "deposit";
     if (filter === "expense") return it.kind === "expense";
@@ -962,15 +1023,24 @@ function renderLedger(){
       const t = it.tx;
       const f = familyById(t.familyId);
 
-      title.textContent = `${d.labels.deposit}: ${formatEUR(t.centsSigned)} · ${familyDisplayName(f||{parent1:"—"})}`;
+      title.textContent = `${d.labels.deposit}: ${formatEUR(t.centsSigned)} · ${familyDisplayName(f || {})}`;
       meta.textContent = `${d.labels.date}: ${t.dateISO}${t.note ? " · " + d.labels.note + ": " + t.note : ""}`;
 
+      // Edit deposit
+      const edit = document.createElement("button");
+      edit.className = "btn";
+      edit.type = "button";
+      edit.textContent = d.actions.edit;
+      edit.addEventListener("click", () => editDepositTx(t.id));
+      actions.appendChild(edit);
+
+      // Delete
       const del = document.createElement("button");
       del.className = "btn btn--danger";
       del.type = "button";
       del.textContent = d.actions.delete;
       del.addEventListener("click", () => {
-        state.tx = state.tx.filter(x => x.id !== t.id);
+        state.tx = state.tx.filter((x) => x.id !== t.id);
         saveState();
         renderAll();
       });
@@ -978,17 +1048,26 @@ function renderLedger(){
     } else {
       const e = it.expense;
       const famCount = (e.participantIds || []).length;
+
       title.textContent = `${d.labels.expense}: ${formatEUR(-e.totalCents)} · ${e.title || d.defaults.expenseTitle}`;
       meta.textContent = `${d.labels.date}: ${e.dateISO} · ${d.labels.splitAcross} ${famCount} ${d.labels.families}`;
 
       const preview = [];
       const ids = (e.participantIds || []).slice();
-      for (const id of ids.slice(0,4)) {
+      for (const id of ids.slice(0, 4)) {
         const f = familyById(id);
         const part = e.perFamilyCentsMap?.[id];
-        preview.push(`${familyDisplayName(f||{parent1:"—"})} (${formatEUR(-(part||0))})`);
+        preview.push(`${familyDisplayName(f || {})} (${formatEUR(-(part || 0))})`);
       }
       if (ids.length > 0) meta.textContent += `\n${preview.join(" · ")}${ids.length > 4 ? " · …" : ""}`;
+
+      // Edit expense (recomputes allocations)
+      const edit = document.createElement("button");
+      edit.className = "btn";
+      edit.type = "button";
+      edit.textContent = d.actions.edit;
+      edit.addEventListener("click", () => editExpense(e.id));
+      actions.appendChild(edit);
 
       const del = document.createElement("button");
       del.className = "btn btn--danger";
@@ -1009,22 +1088,23 @@ function renderLedger(){
 }
 
 /** ---------- actions: family CRUD ---------- **/
-function parseChildrenInput(v){
-  const raw = String(v || "").trim();
-  if (!raw) return [];
-  return raw.split(",").map(s => s.trim()).filter(Boolean).slice(0, 10);
-}
-
-function addFamily(){
+function addFamily() {
   const d = dict();
 
-  const p1 = String(els.parent1.value || "").trim().slice(0,60);
-  const p2 = String(els.parent2.value || "").trim().slice(0,60);
-  const email = String(els.email.value || "").trim().slice(0,120);
+  const p1 = String(els.parent1.value || "").trim().slice(0, 60);
+  const p2 = String(els.parent2.value || "").trim().slice(0, 60);
+  const email = String(els.email.value || "").trim().slice(0, 120);
   const children = parseChildrenInput(els.children.value);
 
-  if (!p1 && !p2) { alert(d.errors.parentRequired); return; }
-  if (!isValidEmail(email)) { alert(d.errors.emailInvalid); return; }
+  // allow child-only families (or parent-only) but require at least one of them
+  if (children.length === 0 && !p1 && !p2) {
+    alert(state.lang === "de" ? "Bitte mindestens ein Kind oder einen Elternteil angeben." : "Please enter at least one child or a parent name.");
+    return;
+  }
+  if (!isValidEmail(email)) {
+    alert(d.errors.emailInvalid);
+    return;
+  }
 
   state.families.push({
     id: uid(),
@@ -1045,11 +1125,14 @@ function addFamily(){
   renderAll();
 }
 
-function editFamily(familyId){
+function editFamily(familyId) {
   const f = familyById(familyId);
   if (!f) return;
 
   const d = dict();
+
+  const kids = prompt(d.childrenLabel || "Children (comma-separated)", (f.children || []).join(", "));
+  if (kids === null) return;
 
   const p1 = prompt(d.parent1Label || "Parent 1", f.parent1 || "");
   if (p1 === null) return;
@@ -1059,28 +1142,39 @@ function editFamily(familyId){
 
   const em = prompt(d.emailLabel || "Email", f.email || "");
   if (em === null) return;
-  if (!isValidEmail(em)) { alert(d.errors.emailInvalid); return; }
+  if (!isValidEmail(em)) {
+    alert(d.errors.emailInvalid);
+    return;
+  }
 
-  const kids = prompt(d.childrenLabel || "Children (comma-separated)", (f.children || []).join(", "));
-  if (kids === null) return;
+  const newChildren = parseChildrenInput(kids);
+  const newP1 = String(p1).trim().slice(0, 60);
+  const newP2 = String(p2).trim().slice(0, 60);
 
-  f.parent1 = String(p1).trim().slice(0,60);
-  f.parent2 = String(p2).trim().slice(0,60);
-  f.email = String(em).trim().slice(0,120);
-  f.children = parseChildrenInput(kids);
+  if (newChildren.length === 0 && !newP1 && !newP2) {
+    alert(state.lang === "de" ? "Bitte mindestens ein Kind oder einen Elternteil angeben." : "Please enter at least one child or a parent name.");
+    return;
+  }
+
+  f.children = newChildren;
+  f.parent1 = newP1;
+  f.parent2 = newP2;
+  f.email = String(em).trim().slice(0, 120);
 
   saveState();
   renderAll();
 }
 
-function deleteFamilyIfPossible(familyId){
-  const hasTx = state.tx.some(t => t.familyId === familyId);
-  const isInExpense = state.expenses.some(e => (e.participantIds || []).includes(familyId));
+function deleteFamilyIfPossible(familyId) {
+  const hasTx = state.tx.some((t) => t.familyId === familyId);
+  const isInExpense = state.expenses.some((e) => (e.participantIds || []).includes(familyId));
 
   if (hasTx || isInExpense) {
-    const ok = confirm(state.lang === "de"
-      ? "Diese Familie hat bereits Buchungen/Teilnahmen. Statt Löschen wird sie jetzt deaktiviert. OK?"
-      : "This family has transactions/participations. Instead of deleting, it will be deactivated. OK?");
+    const ok = confirm(
+      state.lang === "de"
+        ? "Diese Familie hat bereits Buchungen/Teilnahmen. Statt Löschen wird sie jetzt deaktiviert. OK?"
+        : "This family has transactions/participations. Instead of deleting, it will be deactivated. OK?"
+    );
     if (!ok) return;
     const f = familyById(familyId);
     if (f) f.active = false;
@@ -1092,23 +1186,29 @@ function deleteFamilyIfPossible(familyId){
   const ok = confirm(state.lang === "de" ? "Familie wirklich löschen?" : "Delete this family?");
   if (!ok) return;
 
-  state.families = state.families.filter(f => f.id !== familyId);
+  state.families = state.families.filter((f) => f.id !== familyId);
   saveState();
   renderAll();
 }
 
 /** ---------- actions: deposits ---------- **/
-function addDeposit(){
+function addDeposit() {
   const d = dict();
 
   const familyId = els.depositFamily.value || "";
-  if (!familyId) { alert(d.errors.familyMissing); return; }
+  if (!familyId) {
+    alert(d.errors.familyMissing);
+    return;
+  }
 
   const cents = centsFromPositiveInput(els.depositAmount.value);
-  if (!cents) { alert(d.errors.amountInvalid); return; }
+  if (!cents) {
+    alert(d.errors.amountInvalid);
+    return;
+  }
 
   const dateISO = els.depositDate.value || todayISO();
-  const note = String(els.depositNote.value || "").trim().slice(0,120);
+  const note = String(els.depositNote.value || "").trim().slice(0, 120);
 
   state.tx.push({
     id: uid(),
@@ -1129,32 +1229,67 @@ function addDeposit(){
   renderAll();
 }
 
+function editDepositTx(txId) {
+  const t = state.tx.find((x) => x.id === txId);
+  if (!t || t.type !== "deposit") return;
+
+  const d = dict();
+
+  const newDate = prompt(d.dateLabel || "Date", t.dateISO || todayISO());
+  if (newDate === null) return;
+
+  const currentAmount = ((t.centsSigned || 0) / 100).toFixed(2);
+  const newAmountStr = prompt(d.amountLabel || "Amount (€)", currentAmount);
+  if (newAmountStr === null) return;
+  const newCents = centsFromPositiveInput(newAmountStr);
+  if (!newCents) {
+    alert(d.errors.amountInvalid);
+    return;
+  }
+
+  const newNote = prompt(d.noteLabel || "Note (optional)", t.note || "");
+  if (newNote === null) return;
+
+  t.dateISO = String(newDate).trim() || todayISO();
+  t.centsSigned = newCents;
+  t.note = String(newNote).trim().slice(0, 120);
+
+  saveState();
+  renderAll();
+}
+
 /** ---------- actions: class expense split ---------- **/
-function expenseWho(){
+function expenseWho() {
   const el = document.querySelector('input[name="expenseWho"]:checked');
   return el ? el.value : "all";
 }
-function selectedExpenseFamilies(){
+function selectedExpenseFamilies() {
   const checked = Array.from(els.expenseFamilyChecklist.querySelectorAll("input[type=checkbox]:checked"));
-  return checked.map(x => x.value).filter(Boolean);
+  return checked.map((x) => x.value).filter(Boolean);
 }
-function addExpenseSplit(){
+function addExpenseSplit() {
   const d = dict();
 
-  const title = String(els.expenseTitle.value || "").trim().slice(0,80) || d.defaults.expenseTitle;
+  const title = String(els.expenseTitle.value || "").trim().slice(0, 80) || d.defaults.expenseTitle;
   const totalCents = centsFromPositiveInput(els.expenseAmount.value);
-  if (!totalCents) { alert(d.errors.amountInvalid); return; }
+  if (!totalCents) {
+    alert(d.errors.amountInvalid);
+    return;
+  }
 
   const dateISO = els.expenseDate.value || todayISO();
 
   let participantIds = [];
-  if (expenseWho() === "all") participantIds = getActiveFamilies().map(f => f.id);
+  if (expenseWho() === "all") participantIds = getActiveFamilies().map((f) => f.id);
   else participantIds = selectedExpenseFamilies();
 
-  const activeSet = new Set(getActiveFamilies().map(f => f.id));
-  participantIds = participantIds.filter(id => activeSet.has(id));
+  const activeSet = new Set(getActiveFamilies().map((f) => f.id));
+  participantIds = participantIds.filter((id) => activeSet.has(id));
 
-  if (participantIds.length === 0) { alert(d.errors.expenseNoParticipants); return; }
+  if (participantIds.length === 0) {
+    alert(d.errors.expenseNoParticipants);
+    return;
+  }
 
   const perMap = splitCents(totalCents, participantIds);
   const expenseId = uid();
@@ -1186,26 +1321,109 @@ function addExpenseSplit(){
   els.expenseTitle.value = "";
   els.expenseAmount.value = "";
   els.expenseDate.value = dateISO;
-  Array.from(els.expenseFamilyChecklist.querySelectorAll("input[type=checkbox]")).forEach(cb => cb.checked = false);
+  Array.from(els.expenseFamilyChecklist.querySelectorAll("input[type=checkbox]")).forEach((cb) => (cb.checked = false));
 
   saveState();
   renderAll();
 }
-function deleteExpense(expenseId){
-  const ok = confirm(state.lang === "de"
-    ? "Diese Ausgabe löschen? (Alle zugehörigen Anteile werden entfernt.)"
-    : "Delete this expense? (All related allocations will be removed.)");
+
+function deleteExpense(expenseId) {
+  const ok = confirm(
+    state.lang === "de"
+      ? "Diese Ausgabe löschen? (Alle zugehörigen Anteile werden entfernt.)"
+      : "Delete this expense? (All related allocations will be removed.)"
+  );
   if (!ok) return;
 
-  state.expenses = state.expenses.filter(e => e.id !== expenseId);
-  state.tx = state.tx.filter(t => t.expenseId !== expenseId);
+  state.expenses = state.expenses.filter((e) => e.id !== expenseId);
+  state.tx = state.tx.filter((t) => t.expenseId !== expenseId);
+  saveState();
+  renderAll();
+}
+
+/**
+ * Edit expense: edit date, title, total amount.
+ * Recomputes per-family allocations and updates linked allocation tx rows.
+ */
+function editExpense(expenseId) {
+  const e = state.expenses.find((x) => x.id === expenseId);
+  if (!e) return;
+
+  const d = dict();
+
+  const newTitle = prompt(d.expenseTitleLabel || "Title", e.title || d.defaults.expenseTitle);
+  if (newTitle === null) return;
+
+  const newDate = prompt(d.dateLabel || "Date", e.dateISO || todayISO());
+  if (newDate === null) return;
+
+  const currentAmount = ((e.totalCents || 0) / 100).toFixed(2);
+  const newAmountStr = prompt(d.totalAmountLabel || "Total amount (€)", currentAmount);
+  if (newAmountStr === null) return;
+
+  const newTotalCents = centsFromPositiveInput(newAmountStr);
+  if (!newTotalCents) {
+    alert(d.errors.amountInvalid);
+    return;
+  }
+
+  // Keep same participants as before, but filter to families that still exist
+  let participantIds = Array.isArray(e.participantIds) ? e.participantIds.slice() : [];
+  const familySet = new Set(state.families.map((f) => f.id));
+  participantIds = participantIds.filter((id) => familySet.has(id));
+
+  if (participantIds.length === 0) {
+    alert(state.lang === "de" ? "Keine gültigen Teilnehmer mehr für diese Ausgabe." : "No valid participants left for this expense.");
+    return;
+  }
+
+  const perMap = splitCents(newTotalCents, participantIds);
+
+  // Update expense
+  e.title = String(newTitle).trim().slice(0, 80) || d.defaults.expenseTitle;
+  e.dateISO = String(newDate).trim() || todayISO();
+  e.totalCents = newTotalCents;
+  e.participantIds = participantIds;
+  e.perFamilyCentsMap = perMap;
+
+  // Update linked allocation tx rows
+  for (const t of state.tx) {
+    if (t.type !== "allocation") continue;
+    if (t.expenseId !== expenseId) continue;
+
+    const part = perMap[t.familyId] || 0;
+    t.centsSigned = -part;
+    t.dateISO = e.dateISO;
+    t.note = e.title;
+  }
+
+  // Remove orphan allocations (families no longer participating)
+  state.tx = state.tx.filter((t) => !(t.type === "allocation" && t.expenseId === expenseId && !participantIds.includes(t.familyId)));
+
+  // Add missing allocation tx rows (participant exists but tx missing)
+  const existingAllocFamIds = new Set(state.tx.filter((t) => t.type === "allocation" && t.expenseId === expenseId).map((t) => t.familyId));
+  for (const fid of participantIds) {
+    if (existingAllocFamIds.has(fid)) continue;
+    const part = perMap[fid] || 0;
+    state.tx.push({
+      id: uid(),
+      type: "allocation",
+      familyId: fid,
+      centsSigned: -part,
+      dateISO: e.dateISO,
+      note: e.title,
+      createdAt: Date.now(),
+      expenseId,
+    });
+  }
+
   saveState();
   renderAll();
 }
 
 /** ---------- templates ---------- **/
-function fillTemplatePlaceholders(template, f, balanceCents){
-  const parents = familyDisplayName(f);
+function fillTemplatePlaceholders(template, f, balanceCents) {
+  const parents = parentsText(f);
   const kids = childrenText(f) || "—";
   const balance = formatEUR(balanceCents);
   const target = state.targetCents > 0 ? formatEUR(state.targetCents) : "—";
@@ -1222,16 +1440,16 @@ function fillTemplatePlaceholders(template, f, balanceCents){
     .replaceAll("{{today}}", today);
 }
 
-async function copyTextToClipboard(text, buttonEl){
+async function copyTextToClipboard(text, buttonEl) {
   const d = dict();
-  try{
+  try {
     await navigator.clipboard.writeText(text);
-    if (buttonEl){
+    if (buttonEl) {
       const old = buttonEl.textContent;
       buttonEl.textContent = d.errors.copied;
       setTimeout(() => (buttonEl.textContent = old), 900);
     }
-  }catch{
+  } catch {
     const ta = document.createElement("textarea");
     ta.value = text;
     document.body.appendChild(ta);
@@ -1244,7 +1462,7 @@ async function copyTextToClipboard(text, buttonEl){
 /** ---------- Email modal ---------- **/
 let emailFamilyId = null;
 
-function openEmailForFamily(familyId){
+function openEmailForFamily(familyId) {
   const f = familyById(familyId);
   if (!f) return;
 
@@ -1261,7 +1479,7 @@ function openEmailForFamily(familyId){
   openDialog(els.emailDialog);
 }
 
-function updateEmailPreview(){
+function updateEmailPreview() {
   if (!emailFamilyId) return;
   const f = familyById(emailFamilyId);
   if (!f) return;
@@ -1272,13 +1490,13 @@ function updateEmailPreview(){
   els.emailPreview.textContent = fillTemplatePlaceholders(els.emailTemplate.value, f, bal);
 }
 
-function openMailClient(){
+function openMailClient() {
   if (!emailFamilyId) return;
   const f = familyById(emailFamilyId);
   if (!f) return;
 
   state.emailTemplateByLang[state.lang] = {
-    subject: String(els.emailSubject.value || "").slice(0,120),
+    subject: String(els.emailSubject.value || "").slice(0, 120),
     template: String(els.emailTemplate.value || ""),
   };
   saveState();
@@ -1290,17 +1508,17 @@ function openMailClient(){
 }
 
 /** ---------- Reminder batch ---------- **/
-let reminderQueue = []; // [{familyId, subject, body, email}]
+let reminderQueue = [];
 let reminderIndex = 0;
 
-function reminderEligibleFamilies(){
+function reminderEligibleFamilies() {
   const { byFamily } = calcBalances();
 
   const mode = els.reminderMode.value || "below_target";
   const activeOnly = !!els.reminderActiveOnly.checked;
 
   let fams = state.families.slice();
-  if (activeOnly) fams = fams.filter(f => f.active);
+  if (activeOnly) fams = fams.filter((f) => f.active);
 
   const res = [];
   for (const f of fams) {
@@ -1312,15 +1530,14 @@ function reminderEligibleFamilies(){
       continue;
     }
 
-    // below_target
     if (state.targetCents > 0 && due > 0) res.push({ f, bal, due });
   }
 
-  res.sort((a,b)=> familyDisplayName(a.f).localeCompare(familyDisplayName(b.f)));
+  res.sort((a, b) => familyDisplayName(a.f).localeCompare(familyDisplayName(b.f)));
   return res;
 }
 
-function buildReminderQueue(){
+function buildReminderQueue() {
   const d = dict();
   const list = reminderEligibleFamilies();
 
@@ -1336,7 +1553,7 @@ function buildReminderQueue(){
   reminderIndex = 0;
 }
 
-function renderReminderList(){
+function renderReminderList() {
   const list = reminderEligibleFamilies();
   const d = dict();
 
@@ -1345,9 +1562,10 @@ function renderReminderList(){
   if (els.reminderMode.value === "below_target" && (!state.targetCents || state.targetCents <= 0)) {
     const div = document.createElement("div");
     div.className = "muted";
-    div.textContent = state.lang === "de"
-      ? "Bitte zuerst einen Zielbetrag pro Familie setzen (links unter Einstellungen)."
-      : "Please set a target amount per family first (left under Settings).";
+    div.textContent =
+      state.lang === "de"
+        ? "Bitte zuerst einen Zielbetrag pro Familie setzen (links unter Einstellungen)."
+        : "Please set a target amount per family first (left under Settings).";
     els.reminderList.appendChild(div);
     els.reminderCount.textContent = "";
     return;
@@ -1356,9 +1574,7 @@ function renderReminderList(){
   if (list.length === 0) {
     const div = document.createElement("div");
     div.className = "muted";
-    div.textContent = state.lang === "de"
-      ? "Keine passenden Familien für dieses Kriterium."
-      : "No matching families for this criteria.";
+    div.textContent = state.lang === "de" ? "Keine passenden Familien für dieses Kriterium." : "No matching families for this criteria.";
     els.reminderList.appendChild(div);
     els.reminderCount.textContent = "";
     return;
@@ -1380,7 +1596,7 @@ function renderReminderList(){
 
     const meta = document.createElement("div");
     meta.className = "remItem__meta";
-    meta.textContent = `${f.email || "—"} · ${childrenText(f) || "—"}`;
+    meta.textContent = `${f.email || "—"} · ${childrenText(f) || "—"} · ${parentsText(f) || "—"}`;
 
     left.appendChild(name);
     left.appendChild(meta);
@@ -1399,7 +1615,6 @@ function renderReminderList(){
 
     item.appendChild(top);
 
-    // quick actions
     const actions = document.createElement("div");
     actions.className = "familyActions";
 
@@ -1427,21 +1642,18 @@ function renderReminderList(){
     els.reminderList.appendChild(item);
   }
 
-  els.reminderCount.textContent = state.lang === "de"
-    ? `${list.length} Empfänger`
-    : `${list.length} recipients`;
+  els.reminderCount.textContent = state.lang === "de" ? `${list.length} Empfänger` : `${list.length} recipients`;
 }
 
-function openReminderMailForFamily(familyId){
+function openReminderMailForFamily(familyId) {
   const f = familyById(familyId);
   if (!f) return;
 
   const { byFamily } = calcBalances();
   const bal = byFamily.get(familyId) || 0;
 
-  // persist template
   state.reminderTemplateByLang[state.lang] = {
-    subject: String(els.reminderSubject.value || "").slice(0,120),
+    subject: String(els.reminderSubject.value || "").slice(0, 120),
     template: String(els.reminderTemplate.value || ""),
   };
   saveState();
@@ -1454,7 +1666,7 @@ function openReminderMailForFamily(familyId){
   window.location.href = url;
 }
 
-function copyAllReminderTexts(){
+function copyAllReminderTexts() {
   buildReminderQueue();
 
   if (reminderQueue.length === 0) {
@@ -1463,21 +1675,14 @@ function copyAllReminderTexts(){
     return;
   }
 
-  const blocks = reminderQueue.map((r) => {
-    return [
-      "----",
-      `TO: ${r.email}`,
-      `SUBJECT: ${r.subject}`,
-      "",
-      r.body.trim(),
-      ""
-    ].join("\n");
-  });
+  const blocks = reminderQueue.map((r) =>
+    ["----", `TO: ${r.email}`, `SUBJECT: ${r.subject}`, "", r.body.trim(), ""].join("\n")
+  );
 
   copyTextToClipboard(blocks.join("\n"), els.copyAllReminders);
 }
 
-function openNextReminderEmail(){
+function openNextReminderEmail() {
   buildReminderQueue();
   if (reminderQueue.length === 0) return;
 
@@ -1488,7 +1693,7 @@ function openNextReminderEmail(){
   window.location.href = url;
 }
 
-function openReminderDialog(){
+function openReminderDialog() {
   const d = dict();
   const tmpl = state.reminderTemplateByLang?.[state.lang] || d.defaults;
 
@@ -1505,14 +1710,14 @@ function openReminderDialog(){
 /** ---------- Report modal ---------- **/
 let reportFamilyId = null;
 
-function familyTxRows(familyId){
+function familyTxRows(familyId) {
   return state.tx
-    .filter(t => t.familyId === familyId)
+    .filter((t) => t.familyId === familyId)
     .slice()
-    .sort((a,b)=> (b.dateISO.localeCompare(a.dateISO) || b.createdAt - a.createdAt));
+    .sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.createdAt - a.createdAt);
 }
 
-function openReportForFamily(familyId){
+function openReportForFamily(familyId) {
   const d = dict();
   const f = familyById(familyId);
   if (!f) return;
@@ -1527,36 +1732,46 @@ function openReportForFamily(familyId){
 
   const header = `
     <h3>${familyDisplayName(f)}</h3>
-    <div class="muted">${d.labels.email}: ${f.email || "—"} · ${d.labels.children}: ${childrenText(f) || "—"}</div>
+    <div class="muted">${d.labels.email}: ${f.email || "—"} · ${d.labels.children}: ${childrenText(f) || "—"} · ${d.labels.parents}: ${parentsText(f) || "—"}</div>
     <div style="margin-top:10px; font-weight:900;">
       ${d.labels.balance}: <span style="color:${bal < 0 ? "var(--neg)" : bal > 0 ? "var(--pos)" : "inherit"}">${formatEUR(bal)}</span>
     </div>
-    ${state.targetCents > 0 ? `<div class="muted" style="margin-top:6px;">${d.labels.target}: ${formatEUR(state.targetCents)} · ${d.labels.due}: <span style="color:${due > 0 ? "var(--neg)" : "inherit"}">${formatEUR(due)}</span></div>` : ""}
+    ${
+      state.targetCents > 0
+        ? `<div class="muted" style="margin-top:6px;">${d.labels.target}: ${formatEUR(state.targetCents)} · ${d.labels.due}: <span style="color:${
+            due > 0 ? "var(--neg)" : "inherit"
+          }">${formatEUR(due)}</span></div>`
+        : ""
+    }
   `;
 
   let running = 0;
-  const chrono = rows.slice().sort((a,b)=> (a.dateISO.localeCompare(b.dateISO) || a.createdAt - b.createdAt));
+  const chrono = rows.slice().sort((a, b) => a.dateISO.localeCompare(b.dateISO) || a.createdAt - b.createdAt);
   const runMap = new Map();
   for (const t of chrono) {
-    running += (t.centsSigned || 0);
+    running += t.centsSigned || 0;
     runMap.set(t.id, running);
   }
 
-  const tableRows = rows.map(t => {
-    const kind = t.type === "deposit" ? d.labels.deposit : d.labels.expense;
-    const amt = formatEUR(t.centsSigned);
-    const run = formatEUR(runMap.get(t.id) || 0);
-    const note = t.note ? String(t.note).replaceAll("<","&lt;").replaceAll(">","&gt;") : "";
-    return `
+  const tableRows = rows
+    .map((t) => {
+      const kind = t.type === "deposit" ? d.labels.deposit : d.labels.expense;
+      const amt = formatEUR(t.centsSigned);
+      const run = formatEUR(runMap.get(t.id) || 0);
+      const note = t.note ? String(t.note).replaceAll("<", "&lt;").replaceAll(">", "&gt;") : "";
+      return `
       <tr>
         <td>${t.dateISO}</td>
         <td>${kind}</td>
         <td>${note || "—"}</td>
         <td style="text-align:right; font-weight:900;">${amt}</td>
-        <td style="text-align:right; color:${(runMap.get(t.id)||0) < 0 ? "var(--neg)" : (runMap.get(t.id)||0) > 0 ? "var(--pos)" : "inherit"}">${run}</td>
+        <td style="text-align:right; color:${
+          (runMap.get(t.id) || 0) < 0 ? "var(--neg)" : (runMap.get(t.id) || 0) > 0 ? "var(--pos)" : "inherit"
+        }">${run}</td>
       </tr>
     `;
-  }).join("");
+    })
+    .join("");
 
   const typeLabel = d.labelsExtra?.type || (state.lang === "de" ? "Typ" : "Type");
 
@@ -1573,7 +1788,7 @@ function openReportForFamily(familyId){
         </tr>
       </thead>
       <tbody>
-        ${tableRows || `<tr><td colspan="5" class="muted">${state.lang==="de" ? "Keine Buchungen." : "No transactions."}</td></tr>`}
+        ${tableRows || `<tr><td colspan="5" class="muted">${state.lang === "de" ? "Keine Buchungen." : "No transactions."}</td></tr>`}
       </tbody>
     </table>
   `;
@@ -1582,7 +1797,7 @@ function openReportForFamily(familyId){
   openDialog(els.reportDialog);
 }
 
-function copyReportText(){
+function copyReportText() {
   if (!reportFamilyId) return;
   const f = familyById(reportFamilyId);
   if (!f) return;
@@ -1593,26 +1808,29 @@ function copyReportText(){
 
   const lines = [];
   lines.push(`${familyDisplayName(f)} (${f.email || "—"})`);
-  lines.push(`${state.lang==="de" ? "Kinder" : "Children"}: ${childrenText(f) || "—"}`);
-  lines.push(`${state.lang==="de" ? "Saldo" : "Balance"}: ${formatEUR(bal)}`);
+  lines.push(`${state.lang === "de" ? "Kinder" : "Children"}: ${childrenText(f) || "—"}`);
+  lines.push(`${state.lang === "de" ? "Eltern" : "Parents"}: ${parentsText(f) || "—"}`);
+  lines.push(`${state.lang === "de" ? "Saldo" : "Balance"}: ${formatEUR(bal)}`);
   if (state.targetCents > 0) {
-    lines.push(`${state.lang==="de" ? "Ziel" : "Target"}: ${formatEUR(state.targetCents)} · ${state.lang==="de" ? "Fehlt" : "Due"}: ${formatEUR(due)}`);
+    lines.push(
+      `${state.lang === "de" ? "Ziel" : "Target"}: ${formatEUR(state.targetCents)} · ${state.lang === "de" ? "Fehlt" : "Due"}: ${formatEUR(due)}`
+    );
   }
   lines.push("");
-  lines.push(state.lang==="de" ? "Buchungen:" : "Transactions:");
+  lines.push(state.lang === "de" ? "Buchungen:" : "Transactions:");
 
-  const rows = familyTxRows(reportFamilyId).slice().sort((a,b)=> (a.dateISO.localeCompare(b.dateISO) || a.createdAt - a.createdAt));
+  const rows = familyTxRows(reportFamilyId).slice().sort((a, b) => a.dateISO.localeCompare(b.dateISO) || a.createdAt - b.createdAt);
   let running = 0;
   for (const t of rows) {
-    running += (t.centsSigned || 0);
-    const kind = t.type === "deposit" ? (state.lang==="de" ? "Einzahlung" : "Contribution") : (state.lang==="de" ? "Ausgabe" : "Expense");
+    running += t.centsSigned || 0;
+    const kind = t.type === "deposit" ? (state.lang === "de" ? "Einzahlung" : "Contribution") : state.lang === "de" ? "Ausgabe" : "Expense";
     lines.push(`${t.dateISO} · ${kind} · ${formatEUR(t.centsSigned)} · ${t.note || "—"} · ${formatEUR(running)}`);
   }
 
   return lines.join("\n");
 }
 
-function printReport(){
+function printReport() {
   if (!reportFamilyId) return;
   const content = els.reportContent.innerHTML;
 
@@ -1647,15 +1865,12 @@ function printReport(){
 }
 
 /** ---------- export/import ---------- **/
-function openExport(){
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    ...state,
-  };
+function openExport() {
+  const payload = { exportedAt: new Date().toISOString(), ...state };
   els.exportText.value = JSON.stringify(payload, null, 2);
   openDialog(els.exportDialog);
 }
-function downloadJson(){
+function downloadJson() {
   const blob = new Blob([els.exportText.value], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -1665,11 +1880,11 @@ function downloadJson(){
   a.remove();
   URL.revokeObjectURL(a.href);
 }
-function importJsonFile(file){
+function importJsonFile(file) {
   const d = dict();
   const reader = new FileReader();
   reader.onload = () => {
-    try{
+    try {
       const parsed = JSON.parse(String(reader.result || ""));
       if (!parsed || typeof parsed !== "object") throw new Error("bad");
       if (!Array.isArray(parsed.families) || !Array.isArray(parsed.tx) || !Array.isArray(parsed.expenses)) {
@@ -1678,9 +1893,9 @@ function importJsonFile(file){
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
       state = loadState();
       renderAll();
-    }catch{
+    } catch {
       alert(d.errors.importFailed);
-    }finally{
+    } finally {
       els.importInput.value = "";
     }
   };
@@ -1688,8 +1903,10 @@ function importJsonFile(file){
 }
 
 /** ---------- reset ---------- **/
-function openResetConfirm(){ openDialog(els.confirmDialog); }
-function doReset(){
+function openResetConfirm() {
+  openDialog(els.confirmDialog);
+}
+function doReset() {
   localStorage.removeItem(STORAGE_KEY);
   state = defaultState();
   saveState();
@@ -1698,16 +1915,16 @@ function doReset(){
 }
 
 /** ---------- UI toggles ---------- **/
-function updateExpenseUI(){
+function updateExpenseUI() {
   const who = expenseWho();
-  els.expenseSelectedWrap.hidden = (who !== "selected");
+  els.expenseSelectedWrap.hidden = who !== "selected";
 }
 
 /** ---------- target setting ---------- **/
-function renderTargetInput(){
+function renderTargetInput() {
   els.targetAmount.value = state.targetCents ? String((state.targetCents / 100).toFixed(2)) : "";
 }
-function updateTargetFromInput(){
+function updateTargetFromInput() {
   const c = centsFromInput(els.targetAmount.value);
   state.targetCents = c === null ? 0 : c;
   saveState();
@@ -1715,10 +1932,10 @@ function updateTargetFromInput(){
 }
 
 /** ---------- render all ---------- **/
-function renderAll(){
+function renderAll() {
   applyI18n();
-  updateSeoLinkForLang(state.lang); // language-aware explainer link (if #seoLink exists)
-  applyLangVisibility(); // controls SEO+FAQ blocks
+  updateSeoLinkForLang(state.lang);
+  applyLangVisibility();
 
   els.lang.value = state.lang;
   els.theme.value = state.theme;
@@ -1739,9 +1956,7 @@ function renderAll(){
 }
 
 /** ---------- bindings ---------- **/
-els.lang.addEventListener("change", () => {
-  setLang(els.lang.value); // use the switcher
-});
+els.lang.addEventListener("change", () => setLang(els.lang.value));
 
 els.theme.addEventListener("change", () => {
   state.theme = els.theme.value;
@@ -1757,9 +1972,7 @@ els.targetAmount.addEventListener("keydown", (e) => {
 els.addFamilyBtn.addEventListener("click", addFamily);
 els.addDepositBtn.addEventListener("click", addDeposit);
 
-document.querySelectorAll('input[name="expenseWho"]').forEach(r => {
-  r.addEventListener("change", updateExpenseUI);
-});
+document.querySelectorAll('input[name="expenseWho"]').forEach((r) => r.addEventListener("change", updateExpenseUI));
 els.addExpenseBtn.addEventListener("click", addExpenseSplit);
 
 els.search.addEventListener("input", renderFamilies);
@@ -1782,11 +1995,14 @@ els.cancelReset.addEventListener("click", () => closeDialog(els.confirmDialog));
 els.confirmReset.addEventListener("click", doReset);
 
 // Email dialog
-els.closeEmail.addEventListener("click", () => { emailFamilyId = null; closeDialog(els.emailDialog); });
+els.closeEmail.addEventListener("click", () => {
+  emailFamilyId = null;
+  closeDialog(els.emailDialog);
+});
 els.emailTemplate.addEventListener("input", updateEmailPreview);
 els.copyEmail.addEventListener("click", () => {
   state.emailTemplateByLang[state.lang] = {
-    subject: String(els.emailSubject.value || "").slice(0,120),
+    subject: String(els.emailSubject.value || "").slice(0, 120),
     template: String(els.emailTemplate.value || ""),
   };
   saveState();
@@ -1801,14 +2017,14 @@ els.reminderMode.addEventListener("change", renderReminderList);
 els.reminderActiveOnly.addEventListener("change", renderReminderList);
 els.reminderTemplate.addEventListener("input", () => {
   state.reminderTemplateByLang[state.lang] = {
-    subject: String(els.reminderSubject.value || "").slice(0,120),
+    subject: String(els.reminderSubject.value || "").slice(0, 120),
     template: String(els.reminderTemplate.value || ""),
   };
   saveState();
 });
 els.reminderSubject.addEventListener("input", () => {
   state.reminderTemplateByLang[state.lang] = {
-    subject: String(els.reminderSubject.value || "").slice(0,120),
+    subject: String(els.reminderSubject.value || "").slice(0, 120),
     template: String(els.reminderTemplate.value || ""),
   };
   saveState();
@@ -1817,7 +2033,10 @@ els.copyAllReminders.addEventListener("click", copyAllReminderTexts);
 els.openNextReminder.addEventListener("click", openNextReminderEmail);
 
 // Report dialog
-els.closeReport.addEventListener("click", () => { reportFamilyId = null; closeDialog(els.reportDialog); });
+els.closeReport.addEventListener("click", () => {
+  reportFamilyId = null;
+  closeDialog(els.reportDialog);
+});
 els.copyReport.addEventListener("click", () => {
   const text = copyReportText();
   if (text) copyTextToClipboard(text, els.copyReport);
@@ -1825,9 +2044,7 @@ els.copyReport.addEventListener("click", () => {
 els.printReport.addEventListener("click", printReport);
 
 /** ---------- init ---------- **/
-
-// Optional: URL override like ?lang=de or ?lang=en
-(function initLangFromUrl(){
+(function initLangFromUrl() {
   const urlLang = new URLSearchParams(location.search).get("lang");
   if (urlLang) state.lang = normalizeLang(urlLang);
 })();
