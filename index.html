@@ -8,6 +8,7 @@
   <meta name="description" content="Free class fund app (Klassenkasse). GDPR/DSGVO compliant, no login, no cloud. Data is stored locally in your browser. Export regular backups to avoid data loss." />
 
   <link rel="stylesheet" href="style.css" />
+
   <!-- Favicons -->
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -17,10 +18,16 @@
 
 <body>
   <div class="app">
+
+    <!-- =====================================================
+         HEADER
+         ===================================================== -->
     <header class="topbar">
       <div class="topbar__title">
         <h1 data-i18n="appTitle">Class Fund</h1>
-        <p class="sub" data-i18n="appSubtitle">Family accounts, contributions, split class expenses, balances & email texts.</p>
+        <p class="sub" data-i18n="appSubtitle">
+          Family accounts, contributions, split class expenses, balances & email texts.
+        </p>
       </div>
 
       <div class="topbar__controls">
@@ -50,13 +57,29 @@
 
         <button class="btn btn--danger" id="resetBtn" type="button" data-i18n="resetBtn">Reset</button>
       </div>
+
+      <!-- Donate -->
+      <form action="https://www.paypal.com/donate" method="post" target="_top" class="donate">
+        <input type="hidden" name="hosted_button_id" value="UA2Y443NFH76J" />
+        <input
+          type="image"
+          src="https://pics.paypal.com/00/s/NTE0YTZlOWQtZGUwNy00NzU3LWI4ZDYtNWQ2NmYwMTA4YWE2/file.PNG"
+          name="submit"
+          alt="Donate with PayPal"
+        />
+      </form>
     </header>
 
+    <!-- =====================================================
+         MAIN GRID
+         ===================================================== -->
     <main class="grid">
-      <!-- Left column -->
-      <section class="card">
-        <h2 data-i18n="summaryTitle">Overview</h2>
 
+      <!-- ================= LEFT COLUMN ================= -->
+      <section class="card">
+
+        <!-- Summary -->
+        <h2 data-i18n="summaryTitle">Overview</h2>
         <div class="summary">
           <div class="summary__item">
             <div class="summary__label" data-i18n="totalBalanceLabel">Total balance</div>
@@ -74,55 +97,25 @@
 
         <hr class="hr" />
 
+        <!-- Settings -->
         <h2 data-i18n="settingsTitle">Settings</h2>
         <div class="field">
           <label for="targetAmount" data-i18n="targetAmountLabel">Target amount per family (€)</label>
-          <input
-            id="targetAmount"
-            type="number"
-            inputmode="decimal"
-            min="0"
-            step="0.01"
-            data-i18n-placeholder="phTargetAmount"
-          />
+          <input id="targetAmount" type="number" min="0" step="0.01" inputmode="decimal" data-i18n-placeholder="phTargetAmount" />
         </div>
         <p class="hint" data-i18n="targetHint">
-          If set: each family should have at least this balance. Below target shows “Still due …”.
+          If set: each family should have at least this balance.
         </p>
 
         <hr class="hr" />
 
-        <h2 data-i18n="addFamilyTitle">Add family</h2>
-
-        <div class="field">
-          <label for="parent1" data-i18n="parent1Label">Parent 1</label>
-          <input id="parent1" type="text" maxlength="60" data-i18n-placeholder="phParent1" />
-        </div>
-
-        <div class="field">
-          <label for="parent2" data-i18n="parent2Label">Parent 2 (optional)</label>
-          <input id="parent2" type="text" maxlength="60" data-i18n-placeholder="phParent2" />
-        </div>
-
-        <div class="field">
-          <label for="email" data-i18n="emailLabel">Email</label>
-          <input id="email" type="email" maxlength="120" data-i18n-placeholder="phEmail" />
-        </div>
-
-        <div class="field">
-          <label for="children" data-i18n="childrenLabel">Children (comma-separated)</label>
-          <input id="children" type="text" maxlength="120" data-i18n-placeholder="phChildren" />
-        </div>
-
-        <button class="btn btn--primary" id="addFamilyBtn" type="button" data-i18n="addFamilyBtn">Add</button>
-
-        <p class="hint" data-i18n="familyHint">
-          Tip: inactive families are no longer suggested for class expenses, but remain in the history.
-        </p>
-
-        <hr class="hr" />
-
+        <!-- ================= DEPOSIT ================= -->
         <h2 data-i18n="depositTitle">Contribution</h2>
+
+        <div class="field">
+          <label for="depositDate" data-i18n="dateLabel">Date</label>
+          <input id="depositDate" type="date" />
+        </div>
 
         <div class="field">
           <label for="depositFamily" data-i18n="familyLabel">Family</label>
@@ -131,19 +124,7 @@
 
         <div class="field">
           <label for="depositAmount" data-i18n="amountLabel">Amount (€)</label>
-          <input
-            id="depositAmount"
-            type="number"
-            inputmode="decimal"
-            min="0"
-            step="0.01"
-            data-i18n-placeholder="phDepositAmount"
-          />
-        </div>
-
-        <div class="field">
-          <label for="depositDate" data-i18n="dateLabel">Date</label>
-          <input id="depositDate" type="date" />
+          <input id="depositAmount" type="number" step="0.01" inputmode="decimal" data-i18n-placeholder="phDepositAmount" />
         </div>
 
         <div class="field">
@@ -151,11 +132,19 @@
           <input id="depositNote" type="text" maxlength="120" data-i18n-placeholder="phDepositNote" />
         </div>
 
-        <button class="btn btn--primary" id="addDepositBtn" type="button" data-i18n="addDepositBtn">Add contribution</button>
+        <button class="btn btn--primary" id="addDepositBtn" type="button" data-i18n="addDepositBtn">
+          Add contribution
+        </button>
 
         <hr class="hr" />
 
+        <!-- ================= EXPENSE ================= -->
         <h2 data-i18n="classExpenseTitle">Split class expense</h2>
+
+        <div class="field">
+          <label for="expenseDate" data-i18n="dateLabel">Date</label>
+          <input id="expenseDate" type="date" />
+        </div>
 
         <div class="field">
           <label for="expenseTitle" data-i18n="expenseTitleLabel">Title</label>
@@ -164,83 +153,100 @@
 
         <div class="field">
           <label for="expenseAmount" data-i18n="totalAmountLabel">Total amount (€)</label>
-          <input
-            id="expenseAmount"
-            type="number"
-            inputmode="decimal"
-            min="0"
-            step="0.01"
-            data-i18n-placeholder="phExpenseAmount"
-          />
+          <input id="expenseAmount" type="number" step="0.01" inputmode="decimal" data-i18n-placeholder="phExpenseAmount" />
         </div>
 
         <div class="field">
-          <label for="expenseDate" data-i18n="dateLabel">Date</label>
-          <input id="expenseDate" type="date" />
-        </div>
-
-        <div class="field">
-          <label data-i18n="expenseWhoLabel">Who shares this expense?</label>
-          <div class="row2">
-            <label class="radio">
-              <input type="radio" name="expenseWho" value="all" checked />
-              <span data-i18n="expenseAllActive">All active families</span>
-            </label>
-            <label class="radio">
-              <input type="radio" name="expenseWho" value="selected" />
-              <span data-i18n="expenseSelected">Selected families</span>
-            </label>
-          </div>
-        </div>
-
-        <div class="field" id="expenseSelectedWrap" hidden>
-          <label data-i18n="expenseSelectLabel">Selection</label>
+          <label data-i18n="expenseSelectLabel">Families</label>
           <div id="expenseFamilyChecklist" class="checklist"></div>
+          <p class="hint" id="expenseAllHint" hidden data-i18n="expenseAllHint">
+            All eligible families are preselected — uncheck to exclude.
+          </p>
         </div>
 
-        <button class="btn btn--primary" id="addExpenseBtn" type="button" data-i18n="addExpenseBtn">Split expense</button>
+        <button class="btn btn--primary" id="addExpenseBtn" type="button" data-i18n="addExpenseBtn">
+          Split expense
+        </button>
 
         <p class="hint" data-i18n="roundingHint">
-          Note: if cent rounding occurs, the remainder is distributed fairly and shown in the history.
+          Cent remainders are distributed fairly.
         </p>
+
+        <hr class="hr" />
+
+        <!-- ================= ADD FAMILY (RARE) ================= -->
+        <details id="familyFormDetails" class="detailsCard">
+          <summary class="detailsSummary">
+            <span data-i18n="addFamilyTitle">Add family</span>
+            <span class="muted small" data-i18n="familyRareHint">(rarely needed – new family joins)</span>
+          </summary>
+
+          <div class="detailsBody">
+            <div class="field">
+              <label for="parent1" data-i18n="parent1Label">Parent 1</label>
+              <input id="parent1" type="text" maxlength="60" data-i18n-placeholder="phParent1" />
+            </div>
+
+            <div class="field">
+              <label for="parent2" data-i18n="parent2Label">Parent 2 (optional)</label>
+              <input id="parent2" type="text" maxlength="60" data-i18n-placeholder="phParent2" />
+            </div>
+
+            <div class="field">
+              <label for="email" data-i18n="emailLabel">Email</label>
+              <input id="email" type="email" maxlength="120" data-i18n-placeholder="phEmail" />
+              <p class="hint" data-i18n="emailOptionalHint">Optional — reminders/emails are disabled without an email.</p>
+            </div>
+
+            <div class="field">
+              <label for="children" data-i18n="childrenLabel">Children (comma-separated)</label>
+              <input id="children" type="text" maxlength="120" data-i18n-placeholder="phChildren" />
+            </div>
+
+            <div class="row2">
+              <div class="field">
+                <label for="activeFrom" data-i18n="activeFromLabel">In class from</label>
+                <input id="activeFrom" type="date" />
+              </div>
+              <div class="field">
+                <label for="activeTo" data-i18n="activeToLabel">In class until</label>
+                <input id="activeTo" type="date" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="familyNote" data-i18n="familyNoteLabel">Comment</label>
+              <input id="familyNote" type="text" maxlength="160" data-i18n-placeholder="phFamilyNote" />
+            </div>
+
+            <button class="btn btn--primary" id="addFamilyBtn" type="button" data-i18n="addFamilyBtn">
+              Add family
+            </button>
+
+            <p class="hint" data-i18n="familyHint">
+              Tip: inactive families are excluded from selections, but remain in history.
+            </p>
+          </div>
+        </details>
       </section>
 
-      <!-- Right column -->
+      <!-- ================= RIGHT COLUMN ================= -->
       <section class="card">
-        <div class="listHeader">
-          <h2 data-i18n="familiesTitle">Families</h2>
-          <div class="listHeader__right">
-            <input id="search" type="search" data-i18n-placeholder="phSearch" />
-            <select id="statusFilter" class="seg__select">
-              <option value="active" data-i18n="filterActive">Active</option>
-              <option value="all" data-i18n="filterAll">All</option>
-              <option value="inactive" data-i18n="filterInactive">Inactive</option>
-            </select>
-          </div>
-        </div>
-
+        <h2 data-i18n="familiesTitle">Families</h2>
         <div id="familiesList" class="families"></div>
 
         <hr class="hr" />
 
-        <div class="listHeader">
-          <h2 data-i18n="ledgerTitle">History</h2>
-          <div class="listHeader__right">
-            <select id="ledgerFilter" class="seg__select">
-              <option value="all" data-i18n="ledgerAll">All</option>
-              <option value="deposit" data-i18n="ledgerDeposits">Contributions</option>
-              <option value="expense" data-i18n="ledgerExpenses">Expenses</option>
-            </select>
-          </div>
-        </div>
-
+        <h2 data-i18n="ledgerTitle">History</h2>
         <div id="ledger" class="ledger"></div>
 
         <p class="empty muted" id="emptyState" hidden data-i18n="emptyState">
-          No transactions yet — add your first one on the left.
+          No transactions yet.
         </p>
       </section>
     </main>
+
+    <!-- ================= MODALS (kept for full features) ================= -->
 
     <!-- Export modal -->
     <dialog id="exportDialog" class="dialog">
@@ -376,116 +382,10 @@
         <button class="btn btn--primary" id="printReport" type="button" data-i18n="printBtn">Print / PDF</button>
       </div>
     </dialog>
+
   </div>
 
-  <!-- SEO + Privacy -->
-  <section class="seo-privacy" aria-label="Privacy and data protection">
-    <div data-lang="en">
-      <h2>Privacy-friendly & GDPR compliant</h2>
-      <p>
-        This class fund app is completely free and runs entirely in your browser.
-        No accounts, no cloud storage, and no app data is sent to a server.
-      </p>
-      <p>
-        Your class fund data is stored locally in your browser (local storage).
-        This makes the app privacy-friendly and GDPR compliant for parent groups, classes and schools.
-      </p>
-      <p>
-        Important: local browser storage can be deleted (for example when you clear website data, use private browsing,
-        change devices, or reinstall the browser). Please export regular backups to avoid data loss.
-      </p>
-
-      <p class="small muted">
-        This website uses privacy-friendly analytics (no cookies).
-      </p>
-    </div>
-
-    <div data-lang="de">
-      <h2>Datenschutzfreundlich & DSGVO-konform</h2>
-      <p>
-        Diese Klassenkassen-App ist komplett kostenlos und läuft vollständig in deinem Browser.
-        Kein Login, keine Cloud — und die App-Daten werden nicht an einen Server übertragen.
-      </p>
-      <p>
-        Deine Klassenkassen-Daten werden lokal im Browser gespeichert (Local Storage).
-        Dadurch ist die App datenschutzfreundliche und DSGVO-konform – ideal für Elterninitiativen, Klassen und Schulen.
-      </p>
-      <p>
-        Wichtig: Lokaler Browserspeicher kann gelöscht werden (z. B. beim Löschen von Website-Daten,
-        im privaten Modus, beim Gerätewechsel oder bei einer Neuinstallation). Bitte exportiere regelmäßig Backups,
-        damit keine Daten verloren gehen.
-      </p>
-
-      <p class="small muted">
-        Diese Website nutzt datenschutzfreundliche Analytics (ohne Cookies).
-      </p>
-    </div>
-  </section>
-
-  <!-- FAQ (good for SEO) -->
-  <section class="seo-faq" aria-label="FAQ">
-    <div data-lang="en">
-      <h2>FAQ</h2>
-
-      <h3>Is the app free?</h3>
-      <p>Yes — it’s completely free to use.</p>
-
-      <h3>Where is my data stored?</h3>
-      <p>Locally in your browser (local storage). No cloud account needed.</p>
-
-      <h3>Can I lose my data?</h3>
-      <p>
-        Yes. If website data is cleared or you switch devices/browsers, local storage may be removed.
-        Export backups regularly.
-      </p>
-    </div>
-
-    <div data-lang="de">
-      <h2>FAQ</h2>
-
-      <h3>Ist die App kostenlos?</h3>
-      <p>Ja — die Nutzung ist komplett kostenlos.</p>
-
-      <h3>Wo werden meine Daten gespeichert?</h3>
-      <p>Lokal im Browser (Local Storage). Du brauchst kein Cloud-Konto.</p>
-
-      <h3>Können Daten verloren gehen?</h3>
-      <p>
-        Ja. Wenn Website-Daten gelöscht werden oder du Browser/Gerät wechselst, kann der lokale Speicher entfernt werden.
-        Bitte regelmäßig exportieren.
-      </p>
-    </div>
-  </section>
-
-  <!-- SEO teaser -->
-  <section class="seo-teaser" aria-labelledby="classfund-teaser-h2">
-    <div data-lang="en">
-      <h2 id="classfund-teaser-h2" data-i18n="appHeaderSubpage">
-        Why class funds get messy fast
-      </h2>
-      <p data-i18n="appSubpageExplanation">
-        Cash, WhatsApp messages and spreadsheets break down quickly. People lose track of who paid and what the money was used for. ClassFund keeps everything clear in one place.
-      </p>
-      <a id="seoLink" href="/pages/en/class-fund-explainer.html" data-i18n="appSubpageLink">
-        Read how to run a class fund without chaos
-      </a>
-    </div>
-
-    <div data-lang="de">
-      <h2 id="classfund-teaser-h2-de">Warum Klassenkassen schnell unübersichtlich werden</h2>
-      <p>
-        Bargeld, WhatsApp-Nachrichten und Tabellen werden schnell chaotisch. Man verliert den Überblick, wer schon gezahlt hat
-        und wofür das Geld ausgegeben wurde. ClassFund hält alles übersichtlich an einem Ort.
-      </p>
-      <a href="/pages/de/klassenkasse-erklaerung.html">
-        Lies, wie du eine Klassenkasse ohne Chaos organisierst
-      </a>
-    </div>
-  </section>
-
   <script src="app.js"></script>
-
-  <!-- privacy-first analytics (no cookies) -->
   <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
 </body>
 </html>
