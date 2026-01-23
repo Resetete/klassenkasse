@@ -54,7 +54,7 @@ const I18N = {
     phExpenseAmount: "e.g. 120.00",
 
     addFamilyTitle: "Add family",
-    familyRareHint: "(rarely needed – new family joins)",
+    familyRareHint: "That's only needed if a new family joins",
     parent1Label: "Parent 1",
     parent2Label: "Parent 2 (optional)",
     emailLabel: "Email",
@@ -176,7 +176,7 @@ const I18N = {
     phExpenseAmount: "z. B. 120,00",
 
     addFamilyTitle: "Familie hinzufügen",
-    familyRareHint: "(selten nötig – neue Familie kommt dazu)",
+    familyRareHint: "Dies ist nur notwendig, wenn eine neue Familie hinzukommt",
     parent1Label: "Elternteil 1",
     parent2Label: "Elternteil 2 (optional)",
     emailLabel: "E-Mail",
