@@ -159,6 +159,20 @@
         </div>
 
         <div class="field">
+          <label>Auswahl</label>
+          <div class="radio">
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="radio" name="expenseMode" id="expenseModeAll" />
+              <span>Alle Familien auswählen</span>
+            </label>
+            <label style="display:flex; gap:8px; align-items:center; margin-left:14px;">
+              <input type="radio" name="expenseMode" id="expenseModeCustom" />
+              <span>Nur ausgewählte Familien</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
           <label data-i18n="expenseSelectLabel">Families</label>
           <div id="expenseFamilyChecklist" class="checklist"></div>
           <p class="hint" id="expenseAllHint" hidden data-i18n="expenseAllHint">
