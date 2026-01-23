@@ -60,7 +60,7 @@ body{
 .topbar__controls{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
 
 .donate input[type="image"]{
-  height: 44px;
+  height: 10vh;
   width: auto;
   border-radius: 10px;
   border: 1px solid var(--stroke);
