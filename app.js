@@ -1218,6 +1218,7 @@ let reminderIndex = 0;
 function buildReminderQueue() {
   const mode = els.reminderMode?.value || "below_target";
   const activeOnly = !!els.reminderActiveOnly?.checked;
+  const dateISO = todayISO();
 
   const { byFamily } = calcBalances();
 
@@ -1229,7 +1230,10 @@ function buildReminderQueue() {
   const template = String(els.reminderTemplate?.value || "");
 
   const fams = state.families
-    .filter((f) => (activeOnly ? f.active : true))
+    .filter((f) => {
+      if (!activeOnly) return true;
+      return familyEligibleForDate(f, dateISO); // <- manuell aktiv + Zeitraum
+    })
     .slice()
     .sort((a, b) => familyDisplayName(a).localeCompare(familyDisplayName(b)));
 
