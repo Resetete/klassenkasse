@@ -9,7 +9,8 @@
      - manual active=true
      - AND within activeFromISO/activeToISO for expense date
    ✓ Deposit dropdown filtered by date eligibility
-   ✓ Reminder "active only" can be implemented similarly (see note)
+   ✓ Add-Family form wired
+   ✓ NEW: Family overview popup (reportDialog)
    --------------------------------------------------------- */
 
 const STORAGE_KEY = "klassenkasse_familien_v1";
@@ -129,6 +130,14 @@ function formatEUR(cents) {
     return `${n.toFixed(2)} €`;
   }
 }
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 /** ---------- state ---------- **/
 function defaultState() {
@@ -246,7 +255,7 @@ const els = {
   expenseAllHint: document.getElementById("expenseAllHint"),
   addExpenseBtn: document.getElementById("addExpenseBtn"),
 
-  // NEW: mode controls (add in HTML)
+  // mode controls (in HTML)
   expenseModeAll: document.getElementById("expenseModeAll"),
   expenseModeCustom: document.getElementById("expenseModeCustom"),
 
@@ -263,6 +272,13 @@ const els = {
   familiesList: document.getElementById("familiesList"),
   ledger: document.getElementById("ledger"),
   emptyState: document.getElementById("emptyState"),
+
+  // NEW: family report dialog (already in your index.html)
+  reportDialog: document.getElementById("reportDialog"),
+  reportContent: document.getElementById("reportContent"),
+  closeReport: document.getElementById("closeReport"),
+  copyReport: document.getElementById("copyReport"),
+  printReport: document.getElementById("printReport"),
 };
 
 /** ---------- derived helpers ---------- **/
@@ -344,6 +360,154 @@ function calcBalances() {
 }
 
 /** =========================================================
+    NEW: FAMILY OVERVIEW POPUP (reportDialog)
+    ========================================================= */
+let currentReportFamilyId = null;
+
+function familyTxItems(familyId) {
+  const items = [];
+  for (const t of state.tx) {
+    if (t.familyId !== familyId) continue;
+
+    if (t.type === "deposit") {
+      items.push({
+        kind: "deposit",
+        dateISO: t.dateISO,
+        createdAt: t.createdAt || 0,
+        title: state.lang === "de" ? "Einzahlung" : "Contribution",
+        amountCentsSigned: t.centsSigned || 0,
+      });
+    } else {
+      let expenseTitle = "";
+      if (t.expenseId) {
+        const e = state.expenses.find((x) => x.id === t.expenseId);
+        if (e) expenseTitle = e.title || "";
+      }
+      items.push({
+        kind: "allocation",
+        dateISO: t.dateISO,
+        createdAt: t.createdAt || 0,
+        title: (state.lang === "de" ? "Ausgabe" : "Expense") + (expenseTitle ? `: ${expenseTitle}` : ""),
+        amountCentsSigned: t.centsSigned || 0, // negative
+      });
+    }
+  }
+
+  items.sort((a, b) => b.dateISO.localeCompare(a.dateISO) || (b.createdAt - a.createdAt));
+  return items;
+}
+
+function calcFamilyTotals(familyId) {
+  let deposits = 0;
+  let expenses = 0; // positive sum of shares
+  let balance = 0;
+
+  for (const t of state.tx) {
+    if (t.familyId !== familyId) continue;
+    const v = t.centsSigned || 0;
+    balance += v;
+    if (t.type === "deposit") deposits += v;
+    else expenses += Math.abs(v);
+  }
+  return { deposits, expenses, balance };
+}
+
+function reportTextForCopy(familyId) {
+  const f = familyById(familyId);
+  if (!f) return "";
+
+  const { deposits, expenses, balance } = calcFamilyTotals(familyId);
+  const due = dueCents(balance);
+
+  const lines = [];
+  lines.push(`${familyDisplayName(f)}`);
+  lines.push(`Saldo: ${formatEUR(balance)}`);
+  if (state.targetCents > 0) lines.push(`Ziel: ${formatEUR(state.targetCents)} · Fehlt: ${formatEUR(due)}`);
+  lines.push(`Einzahlungen: ${formatEUR(deposits)}`);
+  lines.push(`Ausgaben (Anteile): ${formatEUR(expenses)}`);
+  lines.push("");
+  lines.push("Buchungen:");
+  for (const it of familyTxItems(familyId)) {
+    const sign = it.amountCentsSigned >= 0 ? "+" : "–";
+    lines.push(`- ${it.dateISO} · ${it.title} · ${sign}${formatEUR(Math.abs(it.amountCentsSigned))}`);
+  }
+  return lines.join("\n");
+}
+
+function openFamilyReport(familyId) {
+  const f = familyById(familyId);
+  if (!f || !els.reportDialog || !els.reportContent) return;
+
+  currentReportFamilyId = familyId;
+
+  const { deposits, expenses, balance } = calcFamilyTotals(familyId);
+  const due = dueCents(balance);
+
+  const name = familyDisplayName(f);
+  const parents = parentsText(f);
+  const kids = childrenText(f);
+  const period = (f.activeFromISO || f.activeToISO) ? `${f.activeFromISO || "…"} → ${f.activeToISO || "…"} ` : null;
+
+  const rows = familyTxItems(familyId)
+    .map((it) => {
+      const amt = it.amountCentsSigned;
+      const cls = amt < 0 ? "neg" : amt > 0 ? "pos" : "";
+      return `
+        <tr>
+          <td>${escapeHtml(it.dateISO)}</td>
+          <td>${escapeHtml(it.title)}</td>
+          <td class="${cls}" style="font-weight:900; text-align:right;">
+            ${amt < 0 ? "–" : "+"}${escapeHtml(formatEUR(Math.abs(amt)))}
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  els.reportContent.innerHTML = `
+    <h3 style="margin:0 0 8px;">${escapeHtml(name)}</h3>
+    <div class="muted" style="margin-bottom:10px;">
+      ${kids ? `<div>${escapeHtml(state.lang === "de" ? "Kinder: " : "Children: ")}${escapeHtml(kids)}</div>` : ""}
+      ${parents && parents !== "—" ? `<div>${escapeHtml(state.lang === "de" ? "Eltern: " : "Parents: ")}${escapeHtml(parents)}</div>` : ""}
+      ${f.email ? `<div>${escapeHtml(f.email)}</div>` : ""}
+      ${f.comment ? `<div>${escapeHtml(f.comment)}</div>` : ""}
+      ${period ? `<div>${escapeHtml(period)}</div>` : ""}
+    </div>
+
+    <table>
+      <tbody>
+        <tr><th style="width:42%;">${escapeHtml(state.lang === "de" ? "Saldo" : "Balance")}</th><td style="text-align:right; font-weight:900;">${escapeHtml(formatEUR(balance))}</td></tr>
+        ${state.targetCents > 0 ? `<tr><th>${escapeHtml(state.lang === "de" ? "Ziel" : "Target")}</th><td style="text-align:right;">${escapeHtml(formatEUR(state.targetCents))}</td></tr>` : ""}
+        ${state.targetCents > 0 ? `<tr><th>${escapeHtml(state.lang === "de" ? "Fehlt noch" : "Due")}</th><td style="text-align:right; font-weight:900;">${escapeHtml(formatEUR(due))}</td></tr>` : ""}
+        <tr><th>${escapeHtml(state.lang === "de" ? "Einzahlungen" : "Contributions")}</th><td style="text-align:right;">${escapeHtml(formatEUR(deposits))}</td></tr>
+        <tr><th>${escapeHtml(state.lang === "de" ? "Ausgaben (Anteile)" : "Expenses (shares)")}</th><td style="text-align:right;">${escapeHtml(formatEUR(expenses))}</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin:14px 0 8px;">${escapeHtml(state.lang === "de" ? "Buchungen" : "Transactions")}</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:110px;">${escapeHtml(state.lang === "de" ? "Datum" : "Date")}</th>
+          <th>${escapeHtml(state.lang === "de" ? "Typ" : "Type")}</th>
+          <th style="text-align:right;">${escapeHtml(state.lang === "de" ? "Betrag" : "Amount")}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows || `<tr><td colspan="3" class="muted">${escapeHtml(state.lang === "de" ? "Keine Buchungen." : "No transactions.")}</td></tr>`}
+      </tbody>
+    </table>
+  `;
+
+  els.reportDialog.showModal();
+}
+
+function closeFamilyReport() {
+  if (els.reportDialog?.open) els.reportDialog.close();
+  currentReportFamilyId = null;
+}
+
+/** =========================================================
     EXPENSE SELECTION MODES
     ========================================================= */
 let expenseSelection = new Set();
@@ -364,7 +528,6 @@ function setExpenseMode(mode) {
   state.expenseSelectMode = mode === "custom" ? "custom" : "all";
   saveState();
 
-  // reset selection according to mode
   lastExpenseDateISO = null;
   expenseSelection.clear();
   renderExpenseChecklist();
@@ -374,23 +537,20 @@ function ensureExpenseSelection(dateISO) {
   const eligible = eligibleFamiliesForExpenseDate(dateISO);
   const eligibleIds = new Set(eligible.map((f) => f.id));
 
-  // date changed -> rebuild default depending on mode
   if (lastExpenseDateISO !== dateISO) {
     if (state.expenseSelectMode === "all") {
-      expenseSelection = new Set(eligible.map((f) => f.id)); // preselect all
+      expenseSelection = new Set(eligible.map((f) => f.id));
     } else {
-      expenseSelection = new Set(); // start empty
+      expenseSelection = new Set();
     }
     lastExpenseDateISO = dateISO;
     return;
   }
 
-  // date unchanged -> keep current but drop invalid ids
   expenseSelection.forEach((id) => {
     if (!eligibleIds.has(id)) expenseSelection.delete(id);
   });
 
-  // if mode=all, also auto-add newly eligible (e.g. you changed activeFrom/To)
   if (state.expenseSelectMode === "all") {
     eligibleIds.forEach((id) => expenseSelection.add(id));
   }
@@ -404,7 +564,6 @@ function renderExpenseChecklist() {
   ensureExpenseSelection(dateISO);
   const fams = eligibleFamiliesForExpenseDate(dateISO);
 
-  // hint text
   if (els.expenseAllHint) {
     els.expenseAllHint.hidden = fams.length === 0;
     els.expenseAllHint.textContent =
@@ -458,7 +617,6 @@ function renderExpenseChecklist() {
     els.expenseFamilyChecklist.appendChild(row);
   }
 
-  // sync UI mode controls if present
   if (els.expenseModeAll) els.expenseModeAll.checked = state.expenseSelectMode === "all";
   if (els.expenseModeCustom) els.expenseModeCustom.checked = state.expenseSelectMode === "custom";
 }
@@ -543,6 +701,10 @@ function renderFamilies() {
     meta.appendChild(name);
     meta.appendChild(small);
 
+    // NEW: click on family -> open report popup
+    meta.style.cursor = "pointer";
+    meta.addEventListener("click", () => openFamilyReport(f.id));
+
     const right = document.createElement("div");
     const amt = document.createElement("div");
     amt.className = "amount " + (bal < 0 ? "neg" : bal > 0 ? "pos" : "");
@@ -558,11 +720,16 @@ function renderFamilies() {
     const toggle = document.createElement("button");
     toggle.className = "btn";
     toggle.type = "button";
-    toggle.textContent = f.active ? (state.lang === "de" ? "Inaktiv" : "Deactivate") : state.lang === "de" ? "Aktiv" : "Activate";
+    toggle.textContent = f.active
+      ? state.lang === "de"
+        ? "Inaktiv"
+        : "Deactivate"
+      : state.lang === "de"
+      ? "Aktiv"
+      : "Activate";
     toggle.addEventListener("click", () => {
       f.active = !f.active;
       saveState();
-      // selection might change (eligibility)
       lastExpenseDateISO = null;
       renderAll();
     });
@@ -655,10 +822,7 @@ function editFamilyPrompt(familyId) {
   if (!f) return;
   const d = dict();
 
-  const kids = prompt(
-    state.lang === "de" ? "Kinder (Komma-getrennt)" : "Children (comma-separated)",
-    (f.children || []).join(", ")
-  );
+  const kids = prompt(state.lang === "de" ? "Kinder (Komma-getrennt)" : "Children (comma-separated)", (f.children || []).join(", "));
   if (kids === null) return;
 
   const p1 = prompt(state.lang === "de" ? "Elternteil 1" : "Parent 1", f.parent1 || "");
@@ -674,16 +838,10 @@ function editFamilyPrompt(familyId) {
     return;
   }
 
-  const from = prompt(
-    state.lang === "de" ? "In Klasse ab (YYYY-MM-DD, optional)" : "In class from (YYYY-MM-DD, optional)",
-    f.activeFromISO || ""
-  );
+  const from = prompt(state.lang === "de" ? "In Klasse ab (YYYY-MM-DD, optional)" : "In class from (YYYY-MM-DD, optional)", f.activeFromISO || "");
   if (from === null) return;
 
-  const to = prompt(
-    state.lang === "de" ? "In Klasse bis (YYYY-MM-DD, optional)" : "In class until (YYYY-MM-DD, optional)",
-    f.activeToISO || ""
-  );
+  const to = prompt(state.lang === "de" ? "In Klasse bis (YYYY-MM-DD, optional)" : "In class until (YYYY-MM-DD, optional)", f.activeToISO || "");
   if (to === null) return;
 
   const note = prompt(state.lang === "de" ? "Kommentar (optional)" : "Comment (optional)", f.comment || "");
@@ -698,7 +856,6 @@ function editFamilyPrompt(familyId) {
     return;
   }
 
-  // normalize dates (empty -> null)
   const newFrom = String(from).trim();
   const newTo = String(to).trim();
 
@@ -711,8 +868,6 @@ function editFamilyPrompt(familyId) {
   f.comment = String(note).trim().slice(0, 160);
 
   saveState();
-
-  // eligibility may have changed -> refresh dropdown/checklist defaults
   lastExpenseDateISO = null;
   expenseSelection.clear();
 
@@ -762,11 +917,9 @@ function addFamilyFromForm() {
   const children = parseChildrenInput(els.children?.value || "");
   const comment = String(els.familyNote?.value || "").trim().slice(0, 160);
 
-  // dates (empty -> null)
   const from = String(els.activeFrom?.value || "").trim();
   const to = String(els.activeTo?.value || "").trim();
 
-  // basic validation
   if (email && !isValidEmail(email)) {
     alert(d.errors.emailInvalid);
     return;
@@ -780,7 +933,6 @@ function addFamilyFromForm() {
     return;
   }
 
-  // create family
   const fam = {
     id: uid(),
     parent1: p1,
@@ -789,7 +941,6 @@ function addFamilyFromForm() {
     children,
     active: true,
     createdAt: Date.now(),
-
     comment,
     activeFromISO: from ? from : null,
     activeToISO: to ? to : null,
@@ -797,7 +948,6 @@ function addFamilyFromForm() {
 
   state.families.push(fam);
 
-  // clear form
   if (els.parent1) els.parent1.value = "";
   if (els.parent2) els.parent2.value = "";
   if (els.email) els.email.value = "";
@@ -806,12 +956,9 @@ function addFamilyFromForm() {
   if (els.activeFrom) els.activeFrom.value = "";
   if (els.activeTo) els.activeTo.value = "";
 
-  // close details (nice UX)
   if (els.familyFormDetails) els.familyFormDetails.open = false;
 
   saveState();
-
-  // eligibility changed -> refresh defaults
   lastExpenseDateISO = null;
   expenseSelection.clear();
 
@@ -895,7 +1042,6 @@ function addExpenseSplit() {
     });
   }
 
-  // reset selection for next input according to mode
   lastExpenseDateISO = null;
   expenseSelection.clear();
 
@@ -933,8 +1079,6 @@ function importJsonFile(file) {
         throw new Error("bad format");
       }
 
-      // keep forward/back compatibility:
-      // write raw imported state; loadState() will sanitize and fill defaults.
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
       state = loadState();
 
@@ -1044,6 +1188,7 @@ if (els.expenseAmount) {
   });
 }
 
+/** Add Family wiring (FIX) */
 if (els.addFamilyBtn) {
   els.addFamilyBtn.addEventListener("click", addFamilyFromForm);
 }
@@ -1067,6 +1212,70 @@ if (els.expenseModeAll) {
 if (els.expenseModeCustom) {
   els.expenseModeCustom.addEventListener("change", () => {
     if (els.expenseModeCustom.checked) setExpenseMode("custom");
+  });
+}
+
+/** NEW: report dialog wiring */
+if (els.closeReport) els.closeReport.addEventListener("click", closeFamilyReport);
+
+if (els.reportDialog) {
+  // click outside dialog closes (nice UX)
+  els.reportDialog.addEventListener("click", (e) => {
+    const rect = els.reportDialog.getBoundingClientRect();
+    const inDialog =
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom;
+    if (!inDialog) closeFamilyReport();
+  });
+}
+
+if (els.copyReport) {
+  els.copyReport.addEventListener("click", async () => {
+    if (!currentReportFamilyId) return;
+    const txt = reportTextForCopy(currentReportFamilyId);
+    try {
+      await navigator.clipboard.writeText(txt);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = txt;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+  });
+}
+
+if (els.printReport) {
+  els.printReport.addEventListener("click", () => {
+    if (!els.reportContent) return;
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width,initial-scale=1" />
+          <title>Family Report</title>
+          <style>
+            body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; }
+            table{ width:100%; border-collapse: collapse; font-size: 13px; margin: 10px 0 18px; }
+            th, td{ padding: 8px 6px; border-bottom: 1px solid #ddd; vertical-align: top; }
+            th{ text-align:left; color:#444; }
+            .neg{ color:#b91c1c; }
+            .pos{ color:#166534; }
+          </style>
+        </head>
+        <body>
+          ${els.reportContent.innerHTML}
+          <script>window.print();<\/script>
+        </body>
+      </html>
+    `);
+    w.document.close();
   });
 }
 
