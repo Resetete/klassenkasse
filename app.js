@@ -29,6 +29,11 @@ const I18N = {
       families: "Familien",
       tx: "Buchungen",
       emailMissing: "Keine E-Mail hinterlegt.",
+      reportTitleTx: "Buchungen",
+      reportNoTx: "Keine Buchungen.",
+      typeDeposit: "Einzahlung",
+      typeExpense: "Ausgabe",
+      typeExpenseWithTitle: "Ausgabe: {title}",
     },
     defaults: {
       expenseTitle: "Klassen-Ausgabe",
@@ -64,6 +69,11 @@ const I18N = {
       families: "Families",
       tx: "Transactions",
       emailMissing: "No email set.",
+      reportTitleTx: "Transactions",
+      reportNoTx: "No transactions.",
+      typeDeposit: "Contribution",
+      typeExpense: "Expense",
+      typeExpenseWithTitle: "Expense: {title}",
     },
     defaults: {
       expenseTitle: "Class expense",
@@ -210,8 +220,8 @@ function loadState() {
         createdAt: Number.isFinite(f.createdAt) ? f.createdAt : Date.now(),
 
         comment: typeof f.comment === "string" ? f.comment.slice(0, 160) : "",
-        activeFromISO: typeof f.activeFromISO === "string" && f.activeFromISO ? f.activeFromISO : null,
-        activeToISO: typeof f.activeToISO === "string" && f.activeToISO ? f.activeToISO : null,
+        activeFromISO: (typeof f.activeFromISO === "string" && f.activeFromISO && isISODate(f.activeFromISO)) ? f.activeFromISO : null,
+        activeToISO: (typeof f.activeToISO === "string" && f.activeToISO && isISODate(f.activeToISO)) ? f.activeToISO : null,
       })),
       tx: tx.map((t) => ({
         id: t.id || uid(),
@@ -380,7 +390,9 @@ function calcBalances() {
 let currentReportFamilyId = null;
 
 function familyTxItems(familyId) {
+  const d = dict();
   const items = [];
+
   for (const t of state.tx) {
     if (t.familyId !== familyId) continue;
 
@@ -389,23 +401,30 @@ function familyTxItems(familyId) {
         kind: "deposit",
         dateISO: t.dateISO,
         createdAt: t.createdAt || 0,
-        title: state.lang === "de" ? "Einzahlung" : "Contribution",
+        title: d.labels.typeDeposit,
         amountCentsSigned: t.centsSigned || 0,
       });
-    } else {
-      let expenseTitle = "";
-      if (t.expenseId) {
-        const e = state.expenses.find((x) => x.id === t.expenseId);
-        if (e) expenseTitle = e.title || "";
-      }
-      items.push({
-        kind: "allocation",
-        dateISO: t.dateISO,
-        createdAt: t.createdAt || 0,
-        title: (state.lang === "de" ? "Ausgabe" : "Expense") + (expenseTitle ? `: ${expenseTitle}` : ""),
-        amountCentsSigned: t.centsSigned || 0, // negative
-      });
+      continue;
     }
+
+    // allocation (expense share)
+    let expenseTitle = "";
+    if (t.expenseId) {
+      const e = state.expenses.find((x) => x.id === t.expenseId);
+      if (e) expenseTitle = (e.title || "").trim();
+    }
+
+    const title = expenseTitle
+      ? String(d.labels.typeExpenseWithTitle || "Expense: {title}").replace("{title}", expenseTitle)
+      : d.labels.typeExpense;
+
+    items.push({
+      kind: "allocation",
+      dateISO: t.dateISO,
+      createdAt: t.createdAt || 0,
+      title,
+      amountCentsSigned: t.centsSigned || 0, // negative
+    });
   }
 
   items.sort((a, b) => b.dateISO.localeCompare(a.dateISO) || (b.createdAt - a.createdAt));
@@ -431,21 +450,40 @@ function reportTextForCopy(familyId) {
   const f = familyById(familyId);
   if (!f) return "";
 
+  const isDE = state.lang === "de";
+  const L = {
+    balance: isDE ? "Saldo" : "Balance",
+    target: isDE ? "Ziel" : "Target",
+    due: isDE ? "Fehlt noch" : "Due",
+    deposits: isDE ? "Einzahlungen" : "Contributions",
+    expenses: isDE ? "Ausgaben (Anteile)" : "Expenses (shares)",
+    tx: isDE ? "Buchungen" : "Transactions",
+    deposit: isDE ? "Einzahlung" : "Contribution",
+    expense: isDE ? "Ausgabe" : "Expense",
+  };
+
   const { deposits, expenses, balance } = calcFamilyTotals(familyId);
   const due = dueCents(balance);
 
   const lines = [];
   lines.push(`${familyDisplayName(f)}`);
-  lines.push(`Saldo: ${formatEUR(balance)}`);
-  if (state.targetCents > 0) lines.push(`Ziel: ${formatEUR(state.targetCents)} · Fehlt: ${formatEUR(due)}`);
-  lines.push(`Einzahlungen: ${formatEUR(deposits)}`);
-  lines.push(`Ausgaben (Anteile): ${formatEUR(expenses)}`);
+  lines.push(`${L.balance}: ${formatEUR(balance)}`);
+
+  if (state.targetCents > 0) {
+    lines.push(`${L.target}: ${formatEUR(state.targetCents)} · ${L.due}: ${formatEUR(due)}`);
+  }
+
+  lines.push(`${L.deposits}: ${formatEUR(deposits)}`);
+  lines.push(`${L.expenses}: ${formatEUR(expenses)}`);
   lines.push("");
-  lines.push("Buchungen:");
+  lines.push(`${L.tx}:`);
+
   for (const it of familyTxItems(familyId)) {
+    // it.title kommt aktuell schon aus state.lang (de/en), passt also
     const sign = it.amountCentsSigned >= 0 ? "+" : "–";
     lines.push(`- ${it.dateISO} · ${it.title} · ${sign}${formatEUR(Math.abs(it.amountCentsSigned))}`);
   }
+
   return lines.join("\n");
 }
 
@@ -509,7 +547,7 @@ function openFamilyReport(familyId) {
         </tr>
       </thead>
       <tbody>
-        ${rows || `<tr><td colspan="3" class="muted">${escapeHtml(state.lang === "de" ? "Keine Buchungen." : "No transactions.")}</td></tr>`}
+        ${rows || `<tr><td colspan="3" class="muted">${escapeHtml(dict().labels.reportNoTx)}</td></tr>`}
       </tbody>
     </table>
   `;
@@ -893,15 +931,10 @@ function editFamilyPrompt(familyId) {
     return;
   }
 
-  const newFrom = String(from).trim();
-  const newTo = String(to).trim();
-
   f.children = newChildren;
   f.parent1 = newP1;
   f.parent2 = newP2;
   f.email = String(em).trim().slice(0, 120);
-  f.activeFromISO = newFrom ? newFrom : null;
-  f.activeToISO = newTo ? newTo : null;
   f.comment = String(note).trim().slice(0, 160);
 
   saveState();
@@ -1263,19 +1296,13 @@ if (els.expenseModeCustom) {
   });
 }
 
-/** NEW: report dialog wiring */
+/** report dialog wiring */
 if (els.closeReport) els.closeReport.addEventListener("click", closeFamilyReport);
 
 if (els.reportDialog) {
-  // click outside dialog closes (nice UX)
+  // click on backdrop closes (safe + simple)
   els.reportDialog.addEventListener("click", (e) => {
-    const rect = els.reportDialog.getBoundingClientRect();
-    const inDialog =
-      e.clientX >= rect.left &&
-      e.clientX <= rect.right &&
-      e.clientY >= rect.top &&
-      e.clientY <= rect.bottom;
-    if (!inDialog) closeFamilyReport();
+    if (e.target === els.reportDialog) closeFamilyReport();
   });
 }
 
