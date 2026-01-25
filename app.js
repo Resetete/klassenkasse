@@ -567,7 +567,21 @@ function renderFamilies() {
       renderAll();
     });
 
+    const edit = document.createElement("button");
+    edit.className = "btn";
+    edit.type = "button";
+    edit.textContent = state.lang === "de" ? "Bearbeiten" : "Edit";
+    edit.addEventListener("click", () => editFamilyPrompt(f.id));
+
+    const del = document.createElement("button");
+    del.className = "btn btn--danger";
+    del.type = "button";
+    del.textContent = state.lang === "de" ? "Löschen" : "Delete";
+    del.addEventListener("click", () => deleteFamilyIfPossible(f.id));
+
     actions.appendChild(toggle);
+    actions.appendChild(edit);
+    actions.appendChild(del);
 
     card.appendChild(top);
     card.appendChild(actions);
@@ -632,6 +646,175 @@ function updateTargetFromInput() {
   const c = centsFromInput(els.targetAmount.value);
   state.targetCents = c === null ? 0 : c;
   saveState();
+  renderAll();
+}
+
+/** ---------- Family Edit / Delete ---------- **/
+function editFamilyPrompt(familyId) {
+  const f = familyById(familyId);
+  if (!f) return;
+  const d = dict();
+
+  const kids = prompt(
+    state.lang === "de" ? "Kinder (Komma-getrennt)" : "Children (comma-separated)",
+    (f.children || []).join(", ")
+  );
+  if (kids === null) return;
+
+  const p1 = prompt(state.lang === "de" ? "Elternteil 1" : "Parent 1", f.parent1 || "");
+  if (p1 === null) return;
+
+  const p2 = prompt(state.lang === "de" ? "Elternteil 2 (optional)" : "Parent 2 (optional)", f.parent2 || "");
+  if (p2 === null) return;
+
+  const em = prompt(state.lang === "de" ? "E-Mail (optional)" : "Email (optional)", f.email || "");
+  if (em === null) return;
+  if (em && !isValidEmail(em)) {
+    alert(d.errors.emailInvalid);
+    return;
+  }
+
+  const from = prompt(
+    state.lang === "de" ? "In Klasse ab (YYYY-MM-DD, optional)" : "In class from (YYYY-MM-DD, optional)",
+    f.activeFromISO || ""
+  );
+  if (from === null) return;
+
+  const to = prompt(
+    state.lang === "de" ? "In Klasse bis (YYYY-MM-DD, optional)" : "In class until (YYYY-MM-DD, optional)",
+    f.activeToISO || ""
+  );
+  if (to === null) return;
+
+  const note = prompt(state.lang === "de" ? "Kommentar (optional)" : "Comment (optional)", f.comment || "");
+  if (note === null) return;
+
+  const newChildren = parseChildrenInput(kids);
+  const newP1 = String(p1).trim().slice(0, 60);
+  const newP2 = String(p2).trim().slice(0, 60);
+
+  if (newChildren.length === 0 && !newP1 && !newP2) {
+    alert(d.errors.familyNameRequired);
+    return;
+  }
+
+  // normalize dates (empty -> null)
+  const newFrom = String(from).trim();
+  const newTo = String(to).trim();
+
+  f.children = newChildren;
+  f.parent1 = newP1;
+  f.parent2 = newP2;
+  f.email = String(em).trim().slice(0, 120);
+  f.activeFromISO = newFrom ? newFrom : null;
+  f.activeToISO = newTo ? newTo : null;
+  f.comment = String(note).trim().slice(0, 160);
+
+  saveState();
+
+  // eligibility may have changed -> refresh dropdown/checklist defaults
+  lastExpenseDateISO = null;
+  expenseSelection.clear();
+
+  renderAll();
+}
+
+function deleteFamilyIfPossible(familyId) {
+  const hasTx = state.tx.some((t) => t.familyId === familyId);
+  const isInExpense = state.expenses.some((e) => (e.participantIds || []).includes(familyId));
+
+  if (hasTx || isInExpense) {
+    const ok = confirm(
+      state.lang === "de"
+        ? "Diese Familie hat bereits Buchungen. Statt Löschen wird sie jetzt deaktiviert. OK?"
+        : "This family has transactions. Instead of deleting, it will be deactivated. OK?"
+    );
+    if (!ok) return;
+
+    const f = familyById(familyId);
+    if (f) f.active = false;
+
+    saveState();
+    lastExpenseDateISO = null;
+    expenseSelection.clear();
+    renderAll();
+    return;
+  }
+
+  const ok = confirm(state.lang === "de" ? "Familie wirklich löschen?" : "Delete this family?");
+  if (!ok) return;
+
+  state.families = state.families.filter((f) => f.id !== familyId);
+
+  saveState();
+  lastExpenseDateISO = null;
+  expenseSelection.clear();
+  renderAll();
+}
+
+/** ---------- Add Family (form) ---------- **/
+function addFamilyFromForm() {
+  const d = dict();
+
+  const p1 = String(els.parent1?.value || "").trim().slice(0, 60);
+  const p2 = String(els.parent2?.value || "").trim().slice(0, 60);
+  const email = String(els.email?.value || "").trim().slice(0, 120);
+  const children = parseChildrenInput(els.children?.value || "");
+  const comment = String(els.familyNote?.value || "").trim().slice(0, 160);
+
+  // dates (empty -> null)
+  const from = String(els.activeFrom?.value || "").trim();
+  const to = String(els.activeTo?.value || "").trim();
+
+  // basic validation
+  if (email && !isValidEmail(email)) {
+    alert(d.errors.emailInvalid);
+    return;
+  }
+  if (children.length === 0 && !p1 && !p2) {
+    alert(d.errors.familyNameRequired);
+    return;
+  }
+  if (from && to && to < from) {
+    alert(state.lang === "de" ? "Aktiv-bis muss nach Aktiv-ab liegen." : "Active until must be after active from.");
+    return;
+  }
+
+  // create family
+  const fam = {
+    id: uid(),
+    parent1: p1,
+    parent2: p2,
+    email,
+    children,
+    active: true,
+    createdAt: Date.now(),
+
+    comment,
+    activeFromISO: from ? from : null,
+    activeToISO: to ? to : null,
+  };
+
+  state.families.push(fam);
+
+  // clear form
+  if (els.parent1) els.parent1.value = "";
+  if (els.parent2) els.parent2.value = "";
+  if (els.email) els.email.value = "";
+  if (els.children) els.children.value = "";
+  if (els.familyNote) els.familyNote.value = "";
+  if (els.activeFrom) els.activeFrom.value = "";
+  if (els.activeTo) els.activeTo.value = "";
+
+  // close details (nice UX)
+  if (els.familyFormDetails) els.familyFormDetails.open = false;
+
+  saveState();
+
+  // eligibility changed -> refresh defaults
+  lastExpenseDateISO = null;
+  expenseSelection.clear();
+
   renderAll();
 }
 
@@ -861,7 +1044,21 @@ if (els.expenseAmount) {
   });
 }
 
-/** NEW: mode toggles */
+if (els.addFamilyBtn) {
+  els.addFamilyBtn.addEventListener("click", addFamilyFromForm);
+}
+if (els.parent1) {
+  els.parent1.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") addFamilyFromForm();
+  });
+}
+if (els.children) {
+  els.children.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") addFamilyFromForm();
+  });
+}
+
+/** mode toggles */
 if (els.expenseModeAll) {
   els.expenseModeAll.addEventListener("change", () => {
     if (els.expenseModeAll.checked) setExpenseMode("all");
