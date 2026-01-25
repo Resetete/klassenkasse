@@ -108,6 +108,21 @@ function isValidEmail(v) {
   if (!s) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
+function isISODate(v) {
+  const s = String(v || "").trim();
+  if (!s) return true; // leer ist ok (optional)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + "T00:00:00Z");
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+function assertISODateOrEmpty(value, fieldLabel) {
+  const s = String(value || "").trim();
+  if (!s) return ""; // empty ok
+  if (!isISODate(s)) {
+    throw new Error(fieldLabel);
+  }
+  return s;
+}
 function centsFromInput(v) {
   const n = Number(String(v || "").replace(",", "."));
   if (!Number.isFinite(n) || n < 0) return null;
@@ -844,6 +859,28 @@ function editFamilyPrompt(familyId) {
   const to = prompt(state.lang === "de" ? "In Klasse bis (YYYY-MM-DD, optional)" : "In class until (YYYY-MM-DD, optional)", f.activeToISO || "");
   if (to === null) return;
 
+  const newFromRaw = String(from).trim();
+  const newToRaw = String(to).trim();
+
+  if (newFromRaw && !isISODate(newFromRaw)) {
+    alert(state.lang === "de"
+      ? "Ungültiges Datum bei Aktiv-ab. Bitte YYYY-MM-DD (z. B. 2025-09-01)."
+      : "Invalid date in Active from. Use YYYY-MM-DD (e.g. 2025-09-01).");
+    return;
+  }
+  if (newToRaw && !isISODate(newToRaw)) {
+    alert(state.lang === "de"
+      ? "Ungültiges Datum bei Aktiv-bis. Bitte YYYY-MM-DD (z. B. 2025-09-01)."
+      : "Invalid date in Active until. Use YYYY-MM-DD (e.g. 2025-09-01).");
+    return;
+  }
+  if (newFromRaw && newToRaw && newToRaw < newFromRaw) {
+    alert(state.lang === "de" ? "Aktiv-bis muss nach Aktiv-ab liegen." : "Active until must be after active from.");
+    return;
+  }
+  f.activeFromISO = newFromRaw ? newFromRaw : null;
+  f.activeToISO = newToRaw ? newToRaw : null;
+
   const note = prompt(state.lang === "de" ? "Kommentar (optional)" : "Comment (optional)", f.comment || "");
   if (note === null) return;
 
@@ -917,8 +954,19 @@ function addFamilyFromForm() {
   const children = parseChildrenInput(els.children?.value || "");
   const comment = String(els.familyNote?.value || "").trim().slice(0, 160);
 
-  const from = String(els.activeFrom?.value || "").trim();
-  const to = String(els.activeTo?.value || "").trim();
+  let from = "";
+  let to = "";
+  try {
+    from = assertISODateOrEmpty(els.activeFrom?.value, state.lang === "de" ? "Aktiv ab" : "Active from");
+    to = assertISODateOrEmpty(els.activeTo?.value, state.lang === "de" ? "Aktiv bis" : "Active until");
+  } catch (fieldLabel) {
+    alert(
+      (state.lang === "de"
+        ? `Ungültiges Datumsformat bei "${fieldLabel}". Bitte im Format YYYY-MM-DD eingeben (z. B. 2025-09-01).`
+        : `Invalid date format in "${fieldLabel}". Please use YYYY-MM-DD (e.g. 2025-09-01).`)
+    );
+    return;
+  }
 
   if (email && !isValidEmail(email)) {
     alert(d.errors.emailInvalid);
