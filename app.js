@@ -29,6 +29,11 @@ const I18N = {
       families: "Familien",
       tx: "Buchungen",
       emailMissing: "Keine E-Mail hinterlegt.",
+      reportTitleTx: "Buchungen",
+      reportNoTx: "Keine Buchungen.",
+      typeDeposit: "Einzahlung",
+      typeExpense: "Ausgabe",
+      typeExpenseWithTitle: "Ausgabe: {title}",
     },
     defaults: {
       expenseTitle: "Klassen-Ausgabe",
@@ -64,6 +69,11 @@ const I18N = {
       families: "Families",
       tx: "Transactions",
       emailMissing: "No email set.",
+      reportTitleTx: "Transactions",
+      reportNoTx: "No transactions.",
+      typeDeposit: "Contribution",
+      typeExpense: "Expense",
+      typeExpenseWithTitle: "Expense: {title}",
     },
     defaults: {
       expenseTitle: "Class expense",
@@ -107,6 +117,21 @@ function isValidEmail(v) {
   const s = String(v || "").trim();
   if (!s) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+function isISODate(v) {
+  const s = String(v || "").trim();
+  if (!s) return true; // leer ist ok (optional)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + "T00:00:00Z");
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+function assertISODateOrEmpty(value, fieldLabel) {
+  const s = String(value || "").trim();
+  if (!s) return ""; // empty ok
+  if (!isISODate(s)) {
+    throw new Error(fieldLabel);
+  }
+  return s;
 }
 function centsFromInput(v) {
   const n = Number(String(v || "").replace(",", "."));
@@ -195,8 +220,8 @@ function loadState() {
         createdAt: Number.isFinite(f.createdAt) ? f.createdAt : Date.now(),
 
         comment: typeof f.comment === "string" ? f.comment.slice(0, 160) : "",
-        activeFromISO: typeof f.activeFromISO === "string" && f.activeFromISO ? f.activeFromISO : null,
-        activeToISO: typeof f.activeToISO === "string" && f.activeToISO ? f.activeToISO : null,
+        activeFromISO: (typeof f.activeFromISO === "string" && f.activeFromISO && isISODate(f.activeFromISO)) ? f.activeFromISO : null,
+        activeToISO: (typeof f.activeToISO === "string" && f.activeToISO && isISODate(f.activeToISO)) ? f.activeToISO : null,
       })),
       tx: tx.map((t) => ({
         id: t.id || uid(),
@@ -365,7 +390,9 @@ function calcBalances() {
 let currentReportFamilyId = null;
 
 function familyTxItems(familyId) {
+  const d = dict();
   const items = [];
+
   for (const t of state.tx) {
     if (t.familyId !== familyId) continue;
 
@@ -374,23 +401,30 @@ function familyTxItems(familyId) {
         kind: "deposit",
         dateISO: t.dateISO,
         createdAt: t.createdAt || 0,
-        title: state.lang === "de" ? "Einzahlung" : "Contribution",
+        title: d.labels.typeDeposit,
         amountCentsSigned: t.centsSigned || 0,
       });
-    } else {
-      let expenseTitle = "";
-      if (t.expenseId) {
-        const e = state.expenses.find((x) => x.id === t.expenseId);
-        if (e) expenseTitle = e.title || "";
-      }
-      items.push({
-        kind: "allocation",
-        dateISO: t.dateISO,
-        createdAt: t.createdAt || 0,
-        title: (state.lang === "de" ? "Ausgabe" : "Expense") + (expenseTitle ? `: ${expenseTitle}` : ""),
-        amountCentsSigned: t.centsSigned || 0, // negative
-      });
+      continue;
     }
+
+    // allocation (expense share)
+    let expenseTitle = "";
+    if (t.expenseId) {
+      const e = state.expenses.find((x) => x.id === t.expenseId);
+      if (e) expenseTitle = (e.title || "").trim();
+    }
+
+    const title = expenseTitle
+      ? String(d.labels.typeExpenseWithTitle || "Expense: {title}").replace("{title}", expenseTitle)
+      : d.labels.typeExpense;
+
+    items.push({
+      kind: "allocation",
+      dateISO: t.dateISO,
+      createdAt: t.createdAt || 0,
+      title,
+      amountCentsSigned: t.centsSigned || 0, // negative
+    });
   }
 
   items.sort((a, b) => b.dateISO.localeCompare(a.dateISO) || (b.createdAt - a.createdAt));
@@ -416,21 +450,40 @@ function reportTextForCopy(familyId) {
   const f = familyById(familyId);
   if (!f) return "";
 
+  const isDE = state.lang === "de";
+  const L = {
+    balance: isDE ? "Saldo" : "Balance",
+    target: isDE ? "Ziel" : "Target",
+    due: isDE ? "Fehlt noch" : "Due",
+    deposits: isDE ? "Einzahlungen" : "Contributions",
+    expenses: isDE ? "Ausgaben (Anteile)" : "Expenses (shares)",
+    tx: isDE ? "Buchungen" : "Transactions",
+    deposit: isDE ? "Einzahlung" : "Contribution",
+    expense: isDE ? "Ausgabe" : "Expense",
+  };
+
   const { deposits, expenses, balance } = calcFamilyTotals(familyId);
   const due = dueCents(balance);
 
   const lines = [];
   lines.push(`${familyDisplayName(f)}`);
-  lines.push(`Saldo: ${formatEUR(balance)}`);
-  if (state.targetCents > 0) lines.push(`Ziel: ${formatEUR(state.targetCents)} · Fehlt: ${formatEUR(due)}`);
-  lines.push(`Einzahlungen: ${formatEUR(deposits)}`);
-  lines.push(`Ausgaben (Anteile): ${formatEUR(expenses)}`);
+  lines.push(`${L.balance}: ${formatEUR(balance)}`);
+
+  if (state.targetCents > 0) {
+    lines.push(`${L.target}: ${formatEUR(state.targetCents)} · ${L.due}: ${formatEUR(due)}`);
+  }
+
+  lines.push(`${L.deposits}: ${formatEUR(deposits)}`);
+  lines.push(`${L.expenses}: ${formatEUR(expenses)}`);
   lines.push("");
-  lines.push("Buchungen:");
+  lines.push(`${L.tx}:`);
+
   for (const it of familyTxItems(familyId)) {
+    // it.title kommt aktuell schon aus state.lang (de/en), passt also
     const sign = it.amountCentsSigned >= 0 ? "+" : "–";
     lines.push(`- ${it.dateISO} · ${it.title} · ${sign}${formatEUR(Math.abs(it.amountCentsSigned))}`);
   }
+
   return lines.join("\n");
 }
 
@@ -494,7 +547,7 @@ function openFamilyReport(familyId) {
         </tr>
       </thead>
       <tbody>
-        ${rows || `<tr><td colspan="3" class="muted">${escapeHtml(state.lang === "de" ? "Keine Buchungen." : "No transactions.")}</td></tr>`}
+        ${rows || `<tr><td colspan="3" class="muted">${escapeHtml(dict().labels.reportNoTx)}</td></tr>`}
       </tbody>
     </table>
   `;
@@ -844,6 +897,28 @@ function editFamilyPrompt(familyId) {
   const to = prompt(state.lang === "de" ? "In Klasse bis (YYYY-MM-DD, optional)" : "In class until (YYYY-MM-DD, optional)", f.activeToISO || "");
   if (to === null) return;
 
+  const newFromRaw = String(from).trim();
+  const newToRaw = String(to).trim();
+
+  if (newFromRaw && !isISODate(newFromRaw)) {
+    alert(state.lang === "de"
+      ? "Ungültiges Datum bei Aktiv-ab. Bitte YYYY-MM-DD (z. B. 2025-09-01)."
+      : "Invalid date in Active from. Use YYYY-MM-DD (e.g. 2025-09-01).");
+    return;
+  }
+  if (newToRaw && !isISODate(newToRaw)) {
+    alert(state.lang === "de"
+      ? "Ungültiges Datum bei Aktiv-bis. Bitte YYYY-MM-DD (z. B. 2025-09-01)."
+      : "Invalid date in Active until. Use YYYY-MM-DD (e.g. 2025-09-01).");
+    return;
+  }
+  if (newFromRaw && newToRaw && newToRaw < newFromRaw) {
+    alert(state.lang === "de" ? "Aktiv-bis muss nach Aktiv-ab liegen." : "Active until must be after active from.");
+    return;
+  }
+  f.activeFromISO = newFromRaw ? newFromRaw : null;
+  f.activeToISO = newToRaw ? newToRaw : null;
+
   const note = prompt(state.lang === "de" ? "Kommentar (optional)" : "Comment (optional)", f.comment || "");
   if (note === null) return;
 
@@ -856,15 +931,10 @@ function editFamilyPrompt(familyId) {
     return;
   }
 
-  const newFrom = String(from).trim();
-  const newTo = String(to).trim();
-
   f.children = newChildren;
   f.parent1 = newP1;
   f.parent2 = newP2;
   f.email = String(em).trim().slice(0, 120);
-  f.activeFromISO = newFrom ? newFrom : null;
-  f.activeToISO = newTo ? newTo : null;
   f.comment = String(note).trim().slice(0, 160);
 
   saveState();
@@ -917,8 +987,19 @@ function addFamilyFromForm() {
   const children = parseChildrenInput(els.children?.value || "");
   const comment = String(els.familyNote?.value || "").trim().slice(0, 160);
 
-  const from = String(els.activeFrom?.value || "").trim();
-  const to = String(els.activeTo?.value || "").trim();
+  let from = "";
+  let to = "";
+  try {
+    from = assertISODateOrEmpty(els.activeFrom?.value, state.lang === "de" ? "Aktiv ab" : "Active from");
+    to = assertISODateOrEmpty(els.activeTo?.value, state.lang === "de" ? "Aktiv bis" : "Active until");
+  } catch (fieldLabel) {
+    alert(
+      (state.lang === "de"
+        ? `Ungültiges Datumsformat bei "${fieldLabel}". Bitte im Format YYYY-MM-DD eingeben (z. B. 2025-09-01).`
+        : `Invalid date format in "${fieldLabel}". Please use YYYY-MM-DD (e.g. 2025-09-01).`)
+    );
+    return;
+  }
 
   if (email && !isValidEmail(email)) {
     alert(d.errors.emailInvalid);
@@ -1215,19 +1296,13 @@ if (els.expenseModeCustom) {
   });
 }
 
-/** NEW: report dialog wiring */
+/** report dialog wiring */
 if (els.closeReport) els.closeReport.addEventListener("click", closeFamilyReport);
 
 if (els.reportDialog) {
-  // click outside dialog closes (nice UX)
+  // click on backdrop closes (safe + simple)
   els.reportDialog.addEventListener("click", (e) => {
-    const rect = els.reportDialog.getBoundingClientRect();
-    const inDialog =
-      e.clientX >= rect.left &&
-      e.clientX <= rect.right &&
-      e.clientY >= rect.top &&
-      e.clientY <= rect.bottom;
-    if (!inDialog) closeFamilyReport();
+    if (e.target === els.reportDialog) closeFamilyReport();
   });
 }
 
