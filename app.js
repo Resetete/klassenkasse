@@ -454,6 +454,11 @@ const els = {
   exportBtn: document.getElementById("exportBtn"),
   importInput: document.getElementById("importInput"),
   resetBtn: document.getElementById("resetBtn"),
+  exportDialog: document.getElementById("exportDialog"),
+  exportText: document.getElementById("exportText"),
+  copyExport: document.getElementById("copyExport"),
+  downloadExport: document.getElementById("downloadExport"),
+  closeExport: document.getElementById("closeExport"),
 
   totalBalance: document.getElementById("totalBalance"),
   familiesCount: document.getElementById("familiesCount"),
@@ -1681,21 +1686,6 @@ function deleteExpense(expenseId) {
 }
 
 /** ---------- Export / Import / Reset ---------- **/
-function exportJsonDownload() {
-  const d = dict();
-  const payload = { exportedAt: new Date().toISOString(), ...state };
-
-  const json = JSON.stringify(payload, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = d.ui.exportFilename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(a.href);
-}
-
 function importJsonFile(file) {
   const d = dict();
   const reader = new FileReader();
@@ -1707,13 +1697,15 @@ function importJsonFile(file) {
         throw new Error("bad format");
       }
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-      state = loadState();
+      const cleaned = { ...parsed };
+      delete cleaned.exportedAt;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
 
+      state = loadState();
       lastExpenseDateISO = null;
       expenseSelection.clear();
-
       renderAll();
+
     } catch {
       alert(d.errors.importFailed);
     } finally {
@@ -1921,7 +1913,6 @@ if (els.printReport) {
   });
 }
 
-if (els.exportBtn) els.exportBtn.addEventListener("click", exportJsonDownload);
 if (els.importInput) {
   els.importInput.addEventListener("change", (e) => {
     const file = e.target.files && e.target.files[0];
@@ -1929,6 +1920,63 @@ if (els.importInput) {
   });
 }
 if (els.resetBtn) els.resetBtn.addEventListener("click", resetAll);
+if (els.exportBtn) {
+  els.exportBtn.addEventListener("click", openExportDialog);
+}
+
+function openExportDialog() {
+  if (!els.exportDialog || !els.exportText) return;
+
+  const payload = {
+    ...state,
+    exportedAt: new Date().toISOString(),
+  };
+
+  const json = JSON.stringify(payload, null, 2);
+  els.exportText.value = json;
+
+  els.exportDialog.showModal();
+}
+
+if (els.copyExport) {
+  els.copyExport.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(els.exportText.value);
+    } catch {
+      els.exportText.focus();
+      els.exportText.select();
+      document.execCommand("copy");
+    }
+  });
+}
+
+if (els.downloadExport) {
+  els.downloadExport.addEventListener("click", () => {
+    const d = dict();
+    const json = els.exportText.value;
+
+    const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = d.ui.exportFilename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+
+    // Dialog erst DANACH schließen (oder ganz weglassen)
+    if (els.exportDialog?.open) els.exportDialog.close();
+  });
+}
+
+if (els.closeExport) {
+  els.closeExport.addEventListener("click", () => {
+    els.exportDialog.close();
+  });
+}
 
 /** ---------- init ---------- **/
 (function initFromUrl() {
