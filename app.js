@@ -47,6 +47,10 @@ const I18N = {
       phDepositNote: "z. B. Januar",
       addDepositBtn: "Einzahlung hinzufügen",
 
+      categoryLabel: "Kategorie",
+      categoriesTitle: "Kategorien",
+      uncategorized: "Unkategorisiert",
+
       classExpenseTitle: "Klassen-Ausgabe aufteilen",
       expenseTitleLabel: "Titel",
       phExpenseTitle: "z. B. Ausflug",
@@ -177,6 +181,10 @@ const I18N = {
       noteLabel: "Note (optional)",
       phDepositNote: "e.g. January",
       addDepositBtn: "Add contribution",
+
+      categoryLabel: "Category",
+      categoriesTitle: "Categories",
+      uncategorized: "Uncategorized",
 
       classExpenseTitle: "Split class expense",
       expenseTitleLabel: "Title",
@@ -356,8 +364,8 @@ function defaultState() {
     families: [],
     tx: [],
     expenses: [],
+    categories: ["Einzahlung", "Ausflug", "Reise", "Material", "Geschenk", "Sonstiges"],
 
-    // NEW: expense selection mode (backward compatible default)
     // "all" = preselect all eligible, allow uncheck
     // "custom" = start empty, user checks families
     expenseSelectMode: "all",
@@ -382,6 +390,7 @@ function loadState() {
     const families = Array.isArray(parsed.families) ? parsed.families : [];
     const tx = Array.isArray(parsed.tx) ? parsed.tx : [];
     const expenses = Array.isArray(parsed.expenses) ? parsed.expenses : [];
+    const categories = Array.isArray(parsed.categories) ? parsed.categories.filter(Boolean).map(String) : base.categories;
 
     const expenseSelectMode = parsed.expenseSelectMode === "custom" ? "custom" : "all";
 
@@ -392,6 +401,7 @@ function loadState() {
       theme,
       targetCents,
       expenseSelectMode,
+      categories,
       families: families.map((f) => ({
         id: f.id || uid(),
         parent1: typeof f.parent1 === "string" ? f.parent1.slice(0, 60) : "",
@@ -413,6 +423,7 @@ function loadState() {
         dateISO: typeof t.dateISO === "string" ? t.dateISO : todayISO(),
         note: typeof t.note === "string" ? t.note.slice(0, 120) : "",
         createdAt: Number.isFinite(t.createdAt) ? t.createdAt : Date.now(),
+        category: typeof t.category === "string" ? t.category.slice(0, 40) : null,
         expenseId: typeof t.expenseId === "string" ? t.expenseId : null,
       })),
       expenses: expenses.map((e) => ({
@@ -421,6 +432,7 @@ function loadState() {
         totalCents: Number.isFinite(e.totalCents) ? e.totalCents : 0,
         dateISO: typeof e.dateISO === "string" ? e.dateISO : todayISO(),
         participantIds: Array.isArray(e.participantIds) ? e.participantIds.filter(Boolean) : [],
+        category: typeof e.category === "string" ? e.category.slice(0, 40) : null,
         perFamilyCentsMap: e.perFamilyCentsMap && typeof e.perFamilyCentsMap === "object" ? e.perFamilyCentsMap : {},
         createdAt: Number.isFinite(e.createdAt) ? e.createdAt : Date.now(),
       })),
@@ -454,6 +466,10 @@ const els = {
   depositAmount: document.getElementById("depositAmount"),
   depositNote: document.getElementById("depositNote"),
   addDepositBtn: document.getElementById("addDepositBtn"),
+
+  depositCategory: document.getElementById("depositCategory"),
+  expenseCategory: document.getElementById("expenseCategory"),
+  categoryOverview: document.getElementById("categoryOverview"),
 
   expenseDate: document.getElementById("expenseDate"),
   expenseTitle: document.getElementById("expenseTitle"),
@@ -520,6 +536,48 @@ function familyById(id) {
 function dueCents(balanceCents) {
   if (!state.targetCents || state.targetCents <= 0) return 0;
   return Math.max(0, state.targetCents - (balanceCents || 0));
+}
+
+function uncategorizedLabel() {
+  return dict().text.uncategorized || (state.lang === "de" ? "Unkategorisiert" : "Uncategorized");
+}
+
+function normalizeCategory(raw) {
+  const v = String(raw || "").trim().slice(0, 40);
+  return v || uncategorizedLabel();
+}
+
+function ensureCategoryExists(cat) {
+  const c = normalizeCategory(cat);
+  if (!state.categories.includes(c) && c !== uncategorizedLabel()) {
+    state.categories.push(c);
+    state.categories.sort((a, b) => a.localeCompare(b));
+  }
+  return c;
+}
+
+function renderCategoryPickers() {
+  const cats = (state.categories || []).slice();
+  const unc = uncategorizedLabel();
+  if (!cats.includes(unc)) cats.unshift(unc);
+
+  function fillSelect(sel) {
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = "";
+    for (const c of cats) {
+      const opt = document.createElement("option");
+      opt.value = c;
+      opt.textContent = c;
+      sel.appendChild(opt);
+    }
+    // keep selection if possible
+    if (cats.includes(current)) sel.value = current;
+    else sel.value = unc;
+  }
+
+  fillSelect(els.depositCategory);
+  fillSelect(els.expenseCategory);
 }
 
 /** Only families eligible for a given date are shown/selectable */
@@ -824,6 +882,65 @@ function ensureExpenseSelection(dateISO) {
   if (state.expenseSelectMode === "all") {
     eligibleIds.forEach((id) => expenseSelection.add(id));
   }
+}
+
+function renderCategoryOverview() {
+  if (!els.categoryOverview) return;
+
+  const unc = uncategorizedLabel();
+  const map = new Map(); // cat -> {inCents, outCents}
+
+  function bump(cat, key, cents) {
+    const c = normalizeCategory(cat);
+    if (!map.has(c)) map.set(c, { inCents: 0, outCents: 0 });
+    map.get(c)[key] += cents;
+  }
+
+  // deposits (income)
+  for (const t of state.tx) {
+    if (t.type !== "deposit") continue;
+    bump(t.category || unc, "inCents", Math.max(0, t.centsSigned || 0));
+  }
+
+  // expenses (outgoing) -> use expense objects (totalCents)
+  for (const e of state.expenses) {
+    bump(e.category || unc, "outCents", Math.max(0, e.totalCents || 0));
+  }
+
+  const rows = Array.from(map.entries())
+    .map(([cat, v]) => ({ cat, ...v, net: v.inCents - v.outCents }))
+    .sort((a, b) => (b.outCents - a.outCents) || a.cat.localeCompare(b.cat));
+
+  if (rows.length === 0) {
+    els.categoryOverview.innerHTML = `<div class="muted">${escapeHtml(dict().labels.reportNoTx || "No transactions.")}</div>`;
+    return;
+  }
+
+  const htmlRows = rows.map(r => {
+    const netCls = r.net < 0 ? "neg" : r.net > 0 ? "pos" : "";
+    return `
+      <tr>
+        <td>${escapeHtml(r.cat)}</td>
+        <td style="text-align:right;">${escapeHtml(formatEUR(r.inCents))}</td>
+        <td style="text-align:right;">${escapeHtml(formatEUR(r.outCents))}</td>
+        <td class="${netCls}" style="text-align:right; font-weight:900;">${escapeHtml(formatEUR(r.net))}</td>
+      </tr>
+    `;
+  }).join("");
+
+  els.categoryOverview.innerHTML = `
+    <table class="catTable">
+      <thead>
+        <tr>
+          <th>${escapeHtml(state.lang === "de" ? "Kategorie" : "Category")}</th>
+          <th style="text-align:right;">${escapeHtml(state.lang === "de" ? "Ein" : "In")}</th>
+          <th style="text-align:right;">${escapeHtml(state.lang === "de" ? "Aus" : "Out")}</th>
+          <th style="text-align:right;">${escapeHtml(state.lang === "de" ? "Saldo" : "Net")}</th>
+        </tr>
+      </thead>
+      <tbody>${htmlRows}</tbody>
+    </table>
+  `;
 }
 
 function renderExpenseChecklist() {
@@ -1321,6 +1438,7 @@ function addDeposit() {
   if (!cents) return alert(d.errors.amountInvalid);
 
   const note = String(els.depositNote?.value || "").trim().slice(0, 120);
+  const category = ensureCategoryExists(els.depositCategory?.value);
 
   state.tx.push({
     id: uid(),
@@ -1329,6 +1447,7 @@ function addDeposit() {
     centsSigned: cents,
     dateISO,
     note,
+    category,
     createdAt: Date.now(),
     expenseId: null,
   });
@@ -1346,6 +1465,7 @@ function addExpenseSplit() {
 
   const dateISO = currentExpenseDateISO();
   const title = String(els.expenseTitle?.value || "").trim().slice(0, 80) || d.defaults.expenseTitle;
+  const category = ensureCategoryExists(els.expenseCategory?.value);
   const totalCents = centsFromPositiveInput(els.expenseAmount?.value);
   if (!totalCents) return alert(d.errors.amountInvalid);
 
@@ -1362,6 +1482,7 @@ function addExpenseSplit() {
     title,
     totalCents,
     dateISO,
+    category,
     participantIds,
     perFamilyCentsMap: perMap,
     createdAt: Date.now(),
@@ -1430,6 +1551,10 @@ function editDepositPrompt(txId) {
   const note = prompt(d.labels.note, t.note || "");
   if (note === null) return;
 
+  const cat = prompt(state.lang === "de" ? "Kategorie" : "Category", t.category || uncategorizedLabel());
+  if (cat === null) return;
+  t.category = ensureCategoryExists(cat);
+
   t.dateISO = date;
   t.centsSigned = cents;
   t.note = String(note).trim().slice(0, 120);
@@ -1467,6 +1592,10 @@ function editExpensePrompt(expenseId) {
   if (newTitleRaw === null) return;
   const title = String(newTitleRaw).trim().slice(0, 80) || d.defaults.expenseTitle;
 
+  const cat = prompt(state.lang === "de" ? "Kategorie" : "Category", e.category || uncategorizedLabel());
+  if (cat === null) return;
+  const category = ensureCategoryExists(cat);
+
   const amtStr = prompt(state.lang === "de" ? "Gesamtbetrag (€)" : "Total amount (€)", String((e.totalCents / 100).toFixed(2)));
   if (amtStr === null) return;
   const totalCents = centsFromPositiveInput(amtStr);
@@ -1491,6 +1620,7 @@ function editExpensePrompt(expenseId) {
 
   const ok = rebuildExpenseAllocations(expenseId, title, totalCents, dateISO, newParticipantIds);
   if (!ok) return;
+  e.category = category;
 
   saveState();
   renderAll();
@@ -1608,11 +1738,13 @@ function renderAll() {
 
   renderTargetInput();
   renderDepositFamilyPicker();
+  renderCategoryPickers();
   renderExpenseChecklist();
 
   renderSummary();
   renderFamilies();
   renderLedger();
+  renderCategoryOverview();
 }
 
 /** ---------- Bindings ---------- **/

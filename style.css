@@ -354,6 +354,23 @@ html[data-theme="paper"] .report{ background: rgba(255,255,255,.75); }
 }
 .report th{ text-align:left; color: var(--muted); font-weight: 800; }
 
+/* Category tables */
+.categoryOverview{
+  border:1px solid var(--stroke);
+  background: rgba(0,0,0,.18);
+  border-radius:14px;
+  padding:12px;
+}
+html[data-theme="paper"] .categoryOverview{ background: rgba(255,255,255,.65); }
+
+.catTable{ width:100%; border-collapse: collapse; font-size: 13px; }
+.catTable th, .catTable td{
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--stroke);
+  vertical-align: top;
+}
+.catTable th{ text-align:left; color: var(--muted); font-weight: 800; }
+
 /* ---------- reminder UI ---------- */
 .reminderTop{
   display:flex;
