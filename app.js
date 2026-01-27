@@ -1209,7 +1209,8 @@ function renderLedger() {
         ${categoryBadge(t.category)}
       `;
 
-      meta.textContent = `${d.labels.date}: ${t.dateISO}${t.note ? " · " + d.labels.note + ": " + t.note : ""}`;
+      const noteStr = (typeof t.note === "string" ? t.note : "").trim();
+      meta.textContent = `${d.labels.date}: ${t.dateISO}${noteStr ? " · " + d.labels.note + ": " + noteStr : ""}`;
 
       const editBtn = document.createElement("button");
       editBtn.className = "btn";
@@ -1581,8 +1582,13 @@ function editDepositPrompt(txId) {
   const cents = centsFromPositiveInput(amtStr);
   if (!cents) return alert(d.errors.amountInvalid);
 
-  const note = prompt(d.labels.note, t.note || "");
+  const currentNote = typeof t.note === "string" ? t.note : "";
+  const note = prompt(d.labels.note, currentNote);
   if (note === null) return;
+  const trimmedNote = String(note).trim();
+  if (trimmedNote !== currentNote) {
+    t.note = trimmedNote.slice(0, 120);
+  }
 
   const cat = prompt(state.lang === "de" ? "Kategorie" : "Category", t.category || uncategorizedLabel());
   if (cat === null) return;
@@ -1590,7 +1596,6 @@ function editDepositPrompt(txId) {
 
   t.dateISO = date;
   t.centsSigned = cents;
-  t.note = String(note).trim().slice(0, 120);
 
   saveState();
   renderAll();
