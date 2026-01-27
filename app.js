@@ -547,6 +547,29 @@ function normalizeCategory(raw) {
   return v || uncategorizedLabel();
 }
 
+function categoryClass(cat) {
+  switch (normalizeCategory(cat).toLowerCase()) {
+    case "material":
+      return "badge--cat-material";
+    case "ausflug":
+      return "badge--cat-ausflug";
+    case "geschenk":
+      return "badge--cat-geschenk";
+    case "essen":
+      return "badge--cat-essen";
+    case "einzahlung":
+      return "badge--cat-einzahlung";
+    default:
+      return "badge--cat-unkategorisiert";
+  }
+}
+
+function categoryBadge(cat) {
+  const label = escapeHtml(normalizeCategory(cat));
+  const cls = categoryClass(cat);
+  return `<span class="badge badge--category ${cls}">${label}</span>`;
+}
+
 function ensureCategoryExists(cat) {
   const c = normalizeCategory(cat);
   if (!state.categories.includes(c) && c !== uncategorizedLabel()) {
@@ -1180,7 +1203,12 @@ function renderLedger() {
       const t = it.tx;
       const f = familyById(t.familyId);
 
-      title.textContent = `${d.labels.deposit}: ${formatEUR(t.centsSigned)} · ${familyDisplayName(f || {})}`;
+      title.innerHTML = `
+        ${escapeHtml(d.labels.deposit)}: ${escapeHtml(formatEUR(t.centsSigned))}
+        · ${escapeHtml(familyDisplayName(f || {}))}
+        ${categoryBadge(t.category)}
+      `;
+
       meta.textContent = `${d.labels.date}: ${t.dateISO}${t.note ? " · " + d.labels.note + ": " + t.note : ""}`;
 
       const editBtn = document.createElement("button");
@@ -1201,7 +1229,12 @@ function renderLedger() {
       const e = it.expense;
       const famCount = (e.participantIds || []).length;
 
-      title.textContent = `${d.labels.expense}: ${formatEUR(-e.totalCents)} · ${e.title || d.defaults.expenseTitle}`;
+      title.innerHTML = `
+        ${escapeHtml(d.labels.expense)}: ${escapeHtml(formatEUR(-e.totalCents))}
+        · ${escapeHtml(e.title || d.defaults.expenseTitle)}
+        ${categoryBadge(e.category)}
+      `;
+
       meta.textContent = `${d.labels.date}: ${e.dateISO} · ${state.lang === "de" ? "geteilt auf" : "split across"} ${famCount} ${
         state.lang === "de" ? "Familien" : "families"
       }`;

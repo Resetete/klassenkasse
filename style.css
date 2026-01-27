@@ -463,6 +463,82 @@ details.detailsCard .btn--primary{
   filter: saturate(.95);
 }
 
+/* ---------- category badges ---------- */
+.badge--category{
+  display:inline-flex;
+  align-items:center;
+  padding:4px 9px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  line-height:1;
+  margin-left:6px;
+  white-space:nowrap;
+  border:1px solid transparent;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+
+.badge--category {
+  border: 1px solid transparent;
+}
+
+/* Material */
+.badge--cat-material {
+  background: #236b0f;
+  color: #e0f2fe;
+  border-color: #bae6fd;
+}
+
+/* Ausflug */
+.badge--cat-ausflug {
+  background: #155e75;
+  color: #ecfeff;
+  border-color: #a5f3fc;
+}
+
+/* Geschenk */
+.badge--cat-geschenk {
+  background: #701a75;
+  color: #fdf4ff;
+  border-color: #f5d0fe;
+}
+
+/* Einzahlung */
+.badge--cat-einzahlung {
+  background: #495a06;
+  color: #fdf4ff;
+  border-color: #f5d0fe;
+}
+
+/* Essen */
+.badge--cat-essen {
+  background: #9a3412;
+  color: #fff7ed;
+  border-color: #fed7aa;
+}
+
+/* Fallback */
+.badge--cat-unkategorisiert {
+  background: #265ba4;
+  color: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+/* paper theme tuning */
+html[data-theme="paper"] .badge--category{
+  background-opacity: .9;
+}
+
 /* Mobile comfort */
 @media (max-width: 520px){
   .app{ padding: 14px; }
