@@ -18,6 +18,97 @@ const STORAGE_KEY = "klassenkasse_familien_v1";
 /** ---------- i18n (minimal + safe) ---------- **/
 const I18N = {
   de: {
+    text: {
+      appTitle: "Klassenkasse",
+      appSubtitle: "Familienkonten, Einzahlungen, Klassen-Ausgaben verteilen, Salden & E-Mail Texte.",
+      languageLabel: "Sprache",
+      themeLabel: "Theme",
+      reminderBtn: "Erinnerungen",
+      exportBtn: "Export",
+      importBtn: "Import",
+      resetBtn: "Reset",
+
+      summaryTitle: "Übersicht",
+      totalBalanceLabel: "Gesamtsaldo",
+      familiesCountLabel: "Familien",
+      txCountLabel: "Buchungen",
+
+      settingsTitle: "Einstellungen",
+      targetAmountLabel: "Zielbetrag pro Familie (€)",
+      phTargetAmount: "z. B. 25,00",
+      targetHint: "Wenn gesetzt: Jede Familie sollte mindestens diesen Saldo haben.",
+
+      depositTitle: "Einzahlung",
+      dateLabel: "Datum",
+      familyLabel: "Familie",
+      amountLabel: "Betrag (€)",
+      phDepositAmount: "z. B. 10,00",
+      noteLabel: "Notiz (optional)",
+      phDepositNote: "z. B. Januar",
+      addDepositBtn: "Einzahlung hinzufügen",
+
+      classExpenseTitle: "Klassen-Ausgabe aufteilen",
+      expenseTitleLabel: "Titel",
+      phExpenseTitle: "z. B. Ausflug",
+      totalAmountLabel: "Gesamtbetrag (€)",
+      phExpenseAmount: "z. B. 30,00",
+      expenseSelectLabel: "Familien",
+      expenseAllHint: "Alle passenden Familien sind vorausgewählt — abwählen, um auszuschließen.",
+      addExpenseBtn: "Ausgabe aufteilen",
+      roundingHint: "Cent-Reste werden fair verteilt.",
+
+      addFamilyTitle: "Familie hinzufügen",
+      familyRareHint: "(selten nötig – neue Familie kommt dazu)",
+      parent1Label: "Elternteil 1",
+      phParent1: "Name",
+      parent2Label: "Elternteil 2 (optional)",
+      phParent2: "Name",
+      emailLabel: "E-Mail",
+      phEmail: "name@mail.de",
+      emailOptionalHint: "Optional — ohne E-Mail sind Erinnerungen/Mails deaktiviert.",
+      childrenLabel: "Kinder (kommagetrennt)",
+      phChildren: "z. B. Mia, Leo",
+      activeFromLabel: "In Klasse ab",
+      activeToLabel: "In Klasse bis",
+      familyNoteLabel: "Kommentar",
+      phFamilyNote: "optional",
+      addFamilyBtn: "Familie hinzufügen",
+      familyHint: "Tipp: Inaktive Familien werden aus Auswahlfeldern ausgeschlossen, bleiben aber in der Historie.",
+
+      familiesTitle: "Familien",
+      ledgerTitle: "Historie",
+      emptyState: "Noch keine Buchungen.",
+
+      exportTitle: "Export",
+      exportHelp: "Kopiere dieses JSON oder lade es als Datei herunter.",
+      copyBtn: "Kopieren",
+      downloadBtn: "Download .json",
+
+      resetTitle: "Alles zurücksetzen?",
+      resetHelp: "Alle Daten werden aus diesem Browser gelöscht. Exportiere vorher, wenn du ein Backup möchtest.",
+      cancelBtn: "Abbrechen",
+      confirmBtn: "Zurücksetzen",
+
+      emailTitle: "E-Mail erstellen",
+      emailSubjectLabel: "Betreff",
+      emailTemplateLabel: "Vorlage",
+      emailPlaceholdersHint: "Platzhalter: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
+      openMailBtn: "Mail-App öffnen",
+      emailPreviewLabel: "Vorschau",
+
+      reminderTitle: "Erinnerungen (Batch)",
+      reminderModeLabel: "Kriterium",
+      reminderBelowTarget: "Unter Ziel",
+      reminderNegativeOnly: "Nur negativ",
+      reminderActiveOnly: "Nur aktive Familien",
+      reminderHint: "Platzhalter: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
+      copyAllBtn: "Alle kopieren",
+      openNextBtn: "Nächste Mail öffnen",
+      reminderListLabel: "Empfänger:innen",
+
+      reportTitle: "Übersicht",
+      printBtn: "Drucken / PDF",
+    },
     labels: {
       deposit: "Einzahlung",
       expense: "Ausgabe",
@@ -58,6 +149,97 @@ const I18N = {
     },
   },
   en: {
+    text: {
+      appTitle: "Class Fund",
+      appSubtitle: "Family accounts, contributions, split class expenses, balances & email texts.",
+      languageLabel: "Language",
+      themeLabel: "Theme",
+      reminderBtn: "Reminders",
+      exportBtn: "Export",
+      importBtn: "Import",
+      resetBtn: "Reset",
+
+      summaryTitle: "Overview",
+      totalBalanceLabel: "Total balance",
+      familiesCountLabel: "Families",
+      txCountLabel: "Transactions",
+
+      settingsTitle: "Settings",
+      targetAmountLabel: "Target amount per family (€)",
+      phTargetAmount: "e.g. 25.00",
+      targetHint: "If set: each family should have at least this balance.",
+
+      depositTitle: "Contribution",
+      dateLabel: "Date",
+      familyLabel: "Family",
+      amountLabel: "Amount (€)",
+      phDepositAmount: "e.g. 10.00",
+      noteLabel: "Note (optional)",
+      phDepositNote: "e.g. January",
+      addDepositBtn: "Add contribution",
+
+      classExpenseTitle: "Split class expense",
+      expenseTitleLabel: "Title",
+      phExpenseTitle: "e.g. Trip",
+      totalAmountLabel: "Total amount (€)",
+      phExpenseAmount: "e.g. 30.00",
+      expenseSelectLabel: "Families",
+      expenseAllHint: "All eligible families are preselected — uncheck to exclude.",
+      addExpenseBtn: "Split expense",
+      roundingHint: "Cent remainders are distributed fairly.",
+
+      addFamilyTitle: "Add family",
+      familyRareHint: "(rarely needed – new family joins)",
+      parent1Label: "Parent 1",
+      phParent1: "Name",
+      parent2Label: "Parent 2 (optional)",
+      phParent2: "Name",
+      emailLabel: "Email",
+      phEmail: "name@mail.com",
+      emailOptionalHint: "Optional — reminders/emails are disabled without an email.",
+      childrenLabel: "Children (comma-separated)",
+      phChildren: "e.g. Mia, Leo",
+      activeFromLabel: "In class from",
+      activeToLabel: "In class until",
+      familyNoteLabel: "Comment",
+      phFamilyNote: "optional",
+      addFamilyBtn: "Add family",
+      familyHint: "Tip: inactive families are excluded from selections, but remain in history.",
+
+      familiesTitle: "Families",
+      ledgerTitle: "History",
+      emptyState: "No transactions yet.",
+
+      exportTitle: "Export",
+      exportHelp: "Copy this JSON or download it as a file.",
+      copyBtn: "Copy",
+      downloadBtn: "Download .json",
+
+      resetTitle: "Reset everything?",
+      resetHelp: "All data will be removed from this browser. Export first if you want a backup.",
+      cancelBtn: "Cancel",
+      confirmBtn: "Reset",
+
+      emailTitle: "Create email",
+      emailSubjectLabel: "Subject",
+      emailTemplateLabel: "Template",
+      emailPlaceholdersHint: "Placeholders: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
+      openMailBtn: "Open mail app",
+      emailPreviewLabel: "Preview",
+
+      reminderTitle: "Reminder batch",
+      reminderModeLabel: "Criteria",
+      reminderBelowTarget: "Below target",
+      reminderNegativeOnly: "Negative only",
+      reminderActiveOnly: "Active families only",
+      reminderHint: "Placeholders: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
+      copyAllBtn: "Copy all",
+      openNextBtn: "Open next email",
+      reminderListLabel: "Recipients",
+
+      reportTitle: "Overview",
+      printBtn: "Print / PDF",
+    },
     labels: {
       deposit: "Contribution",
       expense: "Expense",
@@ -298,7 +480,7 @@ const els = {
   ledger: document.getElementById("ledger"),
   emptyState: document.getElementById("emptyState"),
 
-  // NEW: family report dialog (already in your index.html)
+  // family report dialog
   reportDialog: document.getElementById("reportDialog"),
   reportContent: document.getElementById("reportContent"),
   closeReport: document.getElementById("closeReport"),
@@ -368,6 +550,41 @@ function splitCents(totalCents, participantIds) {
     remainder = Math.max(0, remainder - 1);
   }
   return map;
+}
+
+function rebuildExpenseAllocations(expenseId, newTitle, newTotalCents, newDateISO, newParticipantIds) {
+  // Update expense object
+  const e = state.expenses.find((x) => x.id === expenseId);
+  if (!e) return false;
+
+  // Remove all allocation tx rows for this expenseId
+  state.tx = state.tx.filter((t) => !(t.type === "allocation" && t.expenseId === expenseId));
+
+  // Recompute split
+  const perMap = splitCents(newTotalCents, newParticipantIds);
+
+  e.title = newTitle;
+  e.totalCents = newTotalCents;
+  e.dateISO = newDateISO;
+  e.participantIds = newParticipantIds;
+  e.perFamilyCentsMap = perMap;
+
+  // Recreate allocation tx rows
+  for (const fid of newParticipantIds) {
+    const part = perMap[fid] || 0;
+    state.tx.push({
+      id: uid(),
+      type: "allocation",
+      familyId: fid,
+      centsSigned: -part,
+      dateISO: newDateISO,
+      note: newTitle,
+      createdAt: Date.now(),
+      expenseId,
+    });
+  }
+
+  return true;
 }
 
 /** ---------- balances ---------- **/
@@ -822,7 +1039,7 @@ function renderLedger() {
   for (const e of state.expenses) {
     items.push({ kind: "expense", dateISO: e.dateISO, createdAt: e.createdAt, expense: e });
   }
-  items.sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.createdAt - a.createdAt);
+  items.sort((a, b) => b.dateISO.localeCompare(a.dateISO) || (b.createdAt || 0) - (a.createdAt || 0));
 
   els.ledger.innerHTML = "";
   if (els.emptyState) els.emptyState.hidden = items.length !== 0;
@@ -831,28 +1048,69 @@ function renderLedger() {
     const row = document.createElement("div");
     row.className = "txRow";
 
+    const left = document.createElement("div");
+
     const title = document.createElement("div");
     title.className = "txTitle";
 
     const meta = document.createElement("div");
     meta.className = "txMeta";
 
+    const actions = document.createElement("div");
+    actions.className = "txActions";
+
     if (it.kind === "deposit") {
       const t = it.tx;
       const f = familyById(t.familyId);
+
       title.textContent = `${d.labels.deposit}: ${formatEUR(t.centsSigned)} · ${familyDisplayName(f || {})}`;
       meta.textContent = `${d.labels.date}: ${t.dateISO}${t.note ? " · " + d.labels.note + ": " + t.note : ""}`;
+
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn";
+      editBtn.type = "button";
+      editBtn.textContent = state.lang === "de" ? "Bearbeiten" : "Edit";
+      editBtn.addEventListener("click", () => editDepositPrompt(t.id));
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn btn--danger";
+      delBtn.type = "button";
+      delBtn.textContent = state.lang === "de" ? "Löschen" : "Delete";
+      delBtn.addEventListener("click", () => deleteDeposit(t.id));
+
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
     } else {
       const e = it.expense;
       const famCount = (e.participantIds || []).length;
+
       title.textContent = `${d.labels.expense}: ${formatEUR(-e.totalCents)} · ${e.title || d.defaults.expenseTitle}`;
       meta.textContent = `${d.labels.date}: ${e.dateISO} · ${state.lang === "de" ? "geteilt auf" : "split across"} ${famCount} ${
         state.lang === "de" ? "Familien" : "families"
       }`;
+
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn";
+      editBtn.type = "button";
+      editBtn.textContent = state.lang === "de" ? "Bearbeiten" : "Edit";
+      editBtn.addEventListener("click", () => editExpensePrompt(e.id));
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn btn--danger";
+      delBtn.type = "button";
+      delBtn.textContent = state.lang === "de" ? "Löschen" : "Delete";
+      delBtn.addEventListener("click", () => deleteExpense(e.id));
+
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
     }
 
-    row.appendChild(title);
-    row.appendChild(meta);
+    left.appendChild(title);
+    left.appendChild(meta);
+
+    row.appendChild(left);
+    row.appendChild(actions);
+
     els.ledger.appendChild(row);
   }
 }
@@ -1133,6 +1391,127 @@ function addExpenseSplit() {
   renderAll();
 }
 
+function editDepositPrompt(txId) {
+  const d = dict();
+  const t = state.tx.find((x) => x.id === txId);
+  if (!t || t.type !== "deposit") return;
+
+  const dateISO = prompt(d.labels.date, t.dateISO || todayISO());
+  if (dateISO === null) return;
+  if (!isISODate(String(dateISO).trim())) {
+    alert(state.lang === "de" ? "Ungültiges Datum." : "Invalid date.");
+    return;
+  }
+  const date = String(dateISO).trim();
+
+  const f = familyById(t.familyId);
+  const famName = familyDisplayName(f || {});
+  const familyOk = confirm(
+    (state.lang === "de"
+      ? `Familie beibehalten? (${famName})\n(OK = ja, Abbrechen = Auswahl per Dropdown in UI nicht möglich)`
+      : `Keep family? (${famName})\n(OK = yes, Cancel = no)`)
+  );
+  if (!familyOk) return;
+
+  if (f && !familyEligibleForDate(f, date)) {
+    const ok = confirm(
+      state.lang === "de"
+        ? "Achtung: Familie ist für dieses Datum nicht aktiv. Trotzdem speichern?"
+        : "Warning: Family is not active for this date. Save anyway?"
+    );
+    if (!ok) return;
+  }
+
+  const amtStr = prompt(state.lang === "de" ? "Betrag (€)" : "Amount (€)", String((t.centsSigned / 100).toFixed(2)));
+  if (amtStr === null) return;
+  const cents = centsFromPositiveInput(amtStr);
+  if (!cents) return alert(d.errors.amountInvalid);
+
+  const note = prompt(d.labels.note, t.note || "");
+  if (note === null) return;
+
+  t.dateISO = date;
+  t.centsSigned = cents;
+  t.note = String(note).trim().slice(0, 120);
+
+  saveState();
+  renderAll();
+}
+
+function deleteDeposit(txId) {
+  const t = state.tx.find((x) => x.id === txId);
+  if (!t || t.type !== "deposit") return;
+
+  const ok = confirm(state.lang === "de" ? "Einzahlung wirklich löschen?" : "Delete this contribution?");
+  if (!ok) return;
+
+  state.tx = state.tx.filter((x) => x.id !== txId);
+  saveState();
+  renderAll();
+}
+
+function editExpensePrompt(expenseId) {
+  const d = dict();
+  const e = state.expenses.find((x) => x.id === expenseId);
+  if (!e) return;
+
+  const newDateISO = prompt(d.labels.date, e.dateISO || todayISO());
+  if (newDateISO === null) return;
+  if (!isISODate(String(newDateISO).trim())) {
+    alert(state.lang === "de" ? "Ungültiges Datum." : "Invalid date.");
+    return;
+  }
+  const dateISO = String(newDateISO).trim();
+
+  const newTitleRaw = prompt(state.lang === "de" ? "Titel" : "Title", e.title || d.defaults.expenseTitle);
+  if (newTitleRaw === null) return;
+  const title = String(newTitleRaw).trim().slice(0, 80) || d.defaults.expenseTitle;
+
+  const amtStr = prompt(state.lang === "de" ? "Gesamtbetrag (€)" : "Total amount (€)", String((e.totalCents / 100).toFixed(2)));
+  if (amtStr === null) return;
+  const totalCents = centsFromPositiveInput(amtStr);
+  if (!totalCents) return alert(d.errors.amountInvalid);
+
+  // Participants bleiben wie sie sind, aber bei neuem Datum filtern wir un-eligible raus (mit Warnung).
+  const oldIds = Array.isArray(e.participantIds) ? e.participantIds.slice() : [];
+  const eligibleSet = new Set(eligibleFamiliesForExpenseDate(dateISO).map((f) => f.id));
+  const newParticipantIds = oldIds.filter((id) => eligibleSet.has(id));
+
+  if (newParticipantIds.length === 0) {
+    alert(state.lang === "de"
+      ? "Für dieses Datum ist keine der bisherigen Familien aktiv. Bitte Datum ändern oder Ausgabe neu erfassen."
+      : "None of the previous families are eligible for this date. Change date or re-create the expense.");
+    return;
+  }
+  if (newParticipantIds.length !== oldIds.length) {
+    alert(state.lang === "de"
+      ? "Hinweis: Einige Familien sind für das neue Datum nicht aktiv und wurden automatisch entfernt."
+      : "Note: Some families are not eligible for the new date and were removed.");
+  }
+
+  const ok = rebuildExpenseAllocations(expenseId, title, totalCents, dateISO, newParticipantIds);
+  if (!ok) return;
+
+  saveState();
+  renderAll();
+}
+
+function deleteExpense(expenseId) {
+  const e = state.expenses.find((x) => x.id === expenseId);
+  if (!e) return;
+
+  const ok = confirm(state.lang === "de" ? "Ausgabe wirklich löschen?" : "Delete this expense?");
+  if (!ok) return;
+
+  // remove expense
+  state.expenses = state.expenses.filter((x) => x.id !== expenseId);
+  // remove allocations linked to it
+  state.tx = state.tx.filter((t) => !(t.type === "allocation" && t.expenseId === expenseId));
+
+  saveState();
+  renderAll();
+}
+
 /** ---------- Export / Import / Reset ---------- **/
 function exportJsonDownload() {
   const d = dict();
@@ -1199,8 +1578,26 @@ function applyLang() {
   document.documentElement.lang = state.lang;
 }
 
+function t(key) {
+  const d = dict();
+  return (d.text && d.text[key]) || key;
+}
+
+function applyI18n() {
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.getAttribute("data-i18n");
+    el.textContent = t(key);
+  });
+
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    const key = el.getAttribute("data-i18n-placeholder");
+    el.setAttribute("placeholder", t(key));
+  });
+}
+
 function renderAll() {
   applyLang();
+  applyI18n();
   applyTheme();
 
   if (els.lang) els.lang.value = state.lang;

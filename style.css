@@ -403,7 +403,7 @@ html[data-theme="paper"] .reminderList{ background: rgba(255,255,255,.75); }
 .remItem__due{ font-weight: 900; color: var(--neg); }
 
 /* =========================================================
-   NEW: Add-Family <details> "background / rarely used"
+   Add-Family <details> "background / rarely used"
    ========================================================= */
 
 .detailsCard{
