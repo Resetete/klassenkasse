@@ -364,7 +364,7 @@ function defaultState() {
     families: [],
     tx: [],
     expenses: [],
-    categories: ["Einzahlung", "Ausflug", "Reise", "Material", "Geschenk", "Sonstiges"],
+    categories: ["Einzahlung", "Ausflug", "Reise", "Material", "Geschenk", "Veranstaltung", "Sonstiges"],
 
     // "all" = preselect all eligible, allow uncheck
     // "custom" = start empty, user checks families
@@ -560,6 +560,8 @@ function categoryClass(cat) {
       return "badge--cat-ausflug";
     case "geschenk":
       return "badge--cat-geschenk";
+    case "veranstaltung":
+      return "badge--cat-veranstaltung";
     case "essen":
       return "badge--cat-essen";
     case "einzahlung":
@@ -1059,8 +1061,10 @@ function renderDepositFamilyPicker() {
 /** ---------- Summary render ---------- **/
 function renderSummary() {
   const { total } = calcBalances();
+  const activeCount = (state.families || []).filter((f) => f && f.active).length;
+
   if (els.totalBalance) els.totalBalance.textContent = formatEUR(total);
-  if (els.familiesCount) els.familiesCount.textContent = String(state.families.length);
+  if (els.familiesCount) els.familiesCount.textContent = String(activeCount);
   if (els.txCount) els.txCount.textContent = String(state.tx.length);
 
   if (els.totalBalance) {
@@ -1967,7 +1971,6 @@ if (els.downloadExport) {
 
     URL.revokeObjectURL(url);
 
-    // Dialog erst DANACH schließen (oder ganz weglassen)
     if (els.exportDialog?.open) els.exportDialog.close();
   });
 }
