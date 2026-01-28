@@ -47,6 +47,10 @@ const I18N = {
       phDepositNote: "z. B. Januar",
       addDepositBtn: "Einzahlung hinzufügen",
 
+      categoryLabel: "Kategorie",
+      categoriesTitle: "Kategorien",
+      uncategorized: "Unkategorisiert",
+
       classExpenseTitle: "Klassen-Ausgabe aufteilen",
       expenseTitleLabel: "Titel",
       phExpenseTitle: "z. B. Ausflug",
@@ -177,6 +181,10 @@ const I18N = {
       noteLabel: "Note (optional)",
       phDepositNote: "e.g. January",
       addDepositBtn: "Add contribution",
+
+      categoryLabel: "Category",
+      categoriesTitle: "Categories",
+      uncategorized: "Uncategorized",
 
       classExpenseTitle: "Split class expense",
       expenseTitleLabel: "Title",
@@ -356,8 +364,8 @@ function defaultState() {
     families: [],
     tx: [],
     expenses: [],
+    categories: ["Einzahlung", "Ausflug", "Reise", "Material", "Geschenk", "Veranstaltung", "Sonstiges"],
 
-    // NEW: expense selection mode (backward compatible default)
     // "all" = preselect all eligible, allow uncheck
     // "custom" = start empty, user checks families
     expenseSelectMode: "all",
@@ -382,6 +390,7 @@ function loadState() {
     const families = Array.isArray(parsed.families) ? parsed.families : [];
     const tx = Array.isArray(parsed.tx) ? parsed.tx : [];
     const expenses = Array.isArray(parsed.expenses) ? parsed.expenses : [];
+    const categories = Array.isArray(parsed.categories) ? parsed.categories.filter(Boolean).map(String) : base.categories;
 
     const expenseSelectMode = parsed.expenseSelectMode === "custom" ? "custom" : "all";
 
@@ -392,6 +401,7 @@ function loadState() {
       theme,
       targetCents,
       expenseSelectMode,
+      categories,
       families: families.map((f) => ({
         id: f.id || uid(),
         parent1: typeof f.parent1 === "string" ? f.parent1.slice(0, 60) : "",
@@ -413,6 +423,7 @@ function loadState() {
         dateISO: typeof t.dateISO === "string" ? t.dateISO : todayISO(),
         note: typeof t.note === "string" ? t.note.slice(0, 120) : "",
         createdAt: Number.isFinite(t.createdAt) ? t.createdAt : Date.now(),
+        category: typeof t.category === "string" ? t.category.slice(0, 40) : null,
         expenseId: typeof t.expenseId === "string" ? t.expenseId : null,
       })),
       expenses: expenses.map((e) => ({
@@ -421,6 +432,7 @@ function loadState() {
         totalCents: Number.isFinite(e.totalCents) ? e.totalCents : 0,
         dateISO: typeof e.dateISO === "string" ? e.dateISO : todayISO(),
         participantIds: Array.isArray(e.participantIds) ? e.participantIds.filter(Boolean) : [],
+        category: typeof e.category === "string" ? e.category.slice(0, 40) : null,
         perFamilyCentsMap: e.perFamilyCentsMap && typeof e.perFamilyCentsMap === "object" ? e.perFamilyCentsMap : {},
         createdAt: Number.isFinite(e.createdAt) ? e.createdAt : Date.now(),
       })),
@@ -442,6 +454,11 @@ const els = {
   exportBtn: document.getElementById("exportBtn"),
   importInput: document.getElementById("importInput"),
   resetBtn: document.getElementById("resetBtn"),
+  exportDialog: document.getElementById("exportDialog"),
+  exportText: document.getElementById("exportText"),
+  copyExport: document.getElementById("copyExport"),
+  downloadExport: document.getElementById("downloadExport"),
+  closeExport: document.getElementById("closeExport"),
 
   totalBalance: document.getElementById("totalBalance"),
   familiesCount: document.getElementById("familiesCount"),
@@ -454,6 +471,10 @@ const els = {
   depositAmount: document.getElementById("depositAmount"),
   depositNote: document.getElementById("depositNote"),
   addDepositBtn: document.getElementById("addDepositBtn"),
+
+  depositCategory: document.getElementById("depositCategory"),
+  expenseCategory: document.getElementById("expenseCategory"),
+  categoryOverview: document.getElementById("categoryOverview"),
 
   expenseDate: document.getElementById("expenseDate"),
   expenseTitle: document.getElementById("expenseTitle"),
@@ -520,6 +541,73 @@ function familyById(id) {
 function dueCents(balanceCents) {
   if (!state.targetCents || state.targetCents <= 0) return 0;
   return Math.max(0, state.targetCents - (balanceCents || 0));
+}
+
+function uncategorizedLabel() {
+  return dict().text.uncategorized || (state.lang === "de" ? "Unkategorisiert" : "Uncategorized");
+}
+
+function normalizeCategory(raw) {
+  const v = String(raw || "").trim().slice(0, 40);
+  return v || uncategorizedLabel();
+}
+
+function categoryClass(cat) {
+  switch (normalizeCategory(cat).toLowerCase()) {
+    case "material":
+      return "badge--cat-material";
+    case "ausflug":
+      return "badge--cat-ausflug";
+    case "geschenk":
+      return "badge--cat-geschenk";
+    case "veranstaltung":
+      return "badge--cat-veranstaltung";
+    case "essen":
+      return "badge--cat-essen";
+    case "einzahlung":
+      return "badge--cat-einzahlung";
+    default:
+      return "badge--cat-unkategorisiert";
+  }
+}
+
+function categoryBadge(cat) {
+  const label = escapeHtml(normalizeCategory(cat));
+  const cls = categoryClass(cat);
+  return `<span class="badge badge--category ${cls}">${label}</span>`;
+}
+
+function ensureCategoryExists(cat) {
+  const c = normalizeCategory(cat);
+  if (!state.categories.includes(c) && c !== uncategorizedLabel()) {
+    state.categories.push(c);
+    state.categories.sort((a, b) => a.localeCompare(b));
+  }
+  return c;
+}
+
+function renderCategoryPickers() {
+  const cats = (state.categories || []).slice();
+  const unc = uncategorizedLabel();
+  if (!cats.includes(unc)) cats.unshift(unc);
+
+  function fillSelect(sel) {
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = "";
+    for (const c of cats) {
+      const opt = document.createElement("option");
+      opt.value = c;
+      opt.textContent = c;
+      sel.appendChild(opt);
+    }
+    // keep selection if possible
+    if (cats.includes(current)) sel.value = current;
+    else sel.value = unc;
+  }
+
+  fillSelect(els.depositCategory);
+  fillSelect(els.expenseCategory);
 }
 
 /** Only families eligible for a given date are shown/selectable */
@@ -826,6 +914,65 @@ function ensureExpenseSelection(dateISO) {
   }
 }
 
+function renderCategoryOverview() {
+  if (!els.categoryOverview) return;
+
+  const unc = uncategorizedLabel();
+  const map = new Map(); // cat -> {inCents, outCents}
+
+  function bump(cat, key, cents) {
+    const c = normalizeCategory(cat);
+    if (!map.has(c)) map.set(c, { inCents: 0, outCents: 0 });
+    map.get(c)[key] += cents;
+  }
+
+  // deposits (income)
+  for (const t of state.tx) {
+    if (t.type !== "deposit") continue;
+    bump(t.category || unc, "inCents", Math.max(0, t.centsSigned || 0));
+  }
+
+  // expenses (outgoing) -> use expense objects (totalCents)
+  for (const e of state.expenses) {
+    bump(e.category || unc, "outCents", Math.max(0, e.totalCents || 0));
+  }
+
+  const rows = Array.from(map.entries())
+    .map(([cat, v]) => ({ cat, ...v, net: v.inCents - v.outCents }))
+    .sort((a, b) => (b.outCents - a.outCents) || a.cat.localeCompare(b.cat));
+
+  if (rows.length === 0) {
+    els.categoryOverview.innerHTML = `<div class="muted">${escapeHtml(dict().labels.reportNoTx || "No transactions.")}</div>`;
+    return;
+  }
+
+  const htmlRows = rows.map(r => {
+    const netCls = r.net < 0 ? "neg" : r.net > 0 ? "pos" : "";
+    return `
+      <tr>
+        <td>${escapeHtml(r.cat)}</td>
+        <td style="text-align:right;">${escapeHtml(formatEUR(r.inCents))}</td>
+        <td style="text-align:right;">${escapeHtml(formatEUR(r.outCents))}</td>
+        <td class="${netCls}" style="text-align:right; font-weight:900;">${escapeHtml(formatEUR(r.net))}</td>
+      </tr>
+    `;
+  }).join("");
+
+  els.categoryOverview.innerHTML = `
+    <table class="catTable">
+      <thead>
+        <tr>
+          <th>${escapeHtml(state.lang === "de" ? "Kategorie" : "Category")}</th>
+          <th style="text-align:right;">${escapeHtml(state.lang === "de" ? "Ein" : "In")}</th>
+          <th style="text-align:right;">${escapeHtml(state.lang === "de" ? "Aus" : "Out")}</th>
+          <th style="text-align:right;">${escapeHtml(state.lang === "de" ? "Saldo" : "Net")}</th>
+        </tr>
+      </thead>
+      <tbody>${htmlRows}</tbody>
+    </table>
+  `;
+}
+
 function renderExpenseChecklist() {
   if (!els.expenseFamilyChecklist) return;
   const d = dict();
@@ -914,8 +1061,10 @@ function renderDepositFamilyPicker() {
 /** ---------- Summary render ---------- **/
 function renderSummary() {
   const { total } = calcBalances();
+  const activeCount = (state.families || []).filter((f) => f && f.active).length;
+
   if (els.totalBalance) els.totalBalance.textContent = formatEUR(total);
-  if (els.familiesCount) els.familiesCount.textContent = String(state.families.length);
+  if (els.familiesCount) els.familiesCount.textContent = String(activeCount);
   if (els.txCount) els.txCount.textContent = String(state.tx.length);
 
   if (els.totalBalance) {
@@ -1063,8 +1212,14 @@ function renderLedger() {
       const t = it.tx;
       const f = familyById(t.familyId);
 
-      title.textContent = `${d.labels.deposit}: ${formatEUR(t.centsSigned)} · ${familyDisplayName(f || {})}`;
-      meta.textContent = `${d.labels.date}: ${t.dateISO}${t.note ? " · " + d.labels.note + ": " + t.note : ""}`;
+      title.innerHTML = `
+        ${escapeHtml(d.labels.deposit)}: ${escapeHtml(formatEUR(t.centsSigned))}
+        · ${escapeHtml(familyDisplayName(f || {}))}
+        ${categoryBadge(t.category)}
+      `;
+
+      const noteStr = (typeof t.note === "string" ? t.note : "").trim();
+      meta.textContent = `${d.labels.date}: ${t.dateISO}${noteStr ? " · " + d.labels.note + ": " + noteStr : ""}`;
 
       const editBtn = document.createElement("button");
       editBtn.className = "btn";
@@ -1084,7 +1239,12 @@ function renderLedger() {
       const e = it.expense;
       const famCount = (e.participantIds || []).length;
 
-      title.textContent = `${d.labels.expense}: ${formatEUR(-e.totalCents)} · ${e.title || d.defaults.expenseTitle}`;
+      title.innerHTML = `
+        ${escapeHtml(d.labels.expense)}: ${escapeHtml(formatEUR(-e.totalCents))}
+        · ${escapeHtml(e.title || d.defaults.expenseTitle)}
+        ${categoryBadge(e.category)}
+      `;
+
       meta.textContent = `${d.labels.date}: ${e.dateISO} · ${state.lang === "de" ? "geteilt auf" : "split across"} ${famCount} ${
         state.lang === "de" ? "Familien" : "families"
       }`;
@@ -1321,6 +1481,7 @@ function addDeposit() {
   if (!cents) return alert(d.errors.amountInvalid);
 
   const note = String(els.depositNote?.value || "").trim().slice(0, 120);
+  const category = ensureCategoryExists(els.depositCategory?.value);
 
   state.tx.push({
     id: uid(),
@@ -1329,6 +1490,7 @@ function addDeposit() {
     centsSigned: cents,
     dateISO,
     note,
+    category,
     createdAt: Date.now(),
     expenseId: null,
   });
@@ -1346,6 +1508,7 @@ function addExpenseSplit() {
 
   const dateISO = currentExpenseDateISO();
   const title = String(els.expenseTitle?.value || "").trim().slice(0, 80) || d.defaults.expenseTitle;
+  const category = ensureCategoryExists(els.expenseCategory?.value);
   const totalCents = centsFromPositiveInput(els.expenseAmount?.value);
   if (!totalCents) return alert(d.errors.amountInvalid);
 
@@ -1362,6 +1525,7 @@ function addExpenseSplit() {
     title,
     totalCents,
     dateISO,
+    category,
     participantIds,
     perFamilyCentsMap: perMap,
     createdAt: Date.now(),
@@ -1427,12 +1591,20 @@ function editDepositPrompt(txId) {
   const cents = centsFromPositiveInput(amtStr);
   if (!cents) return alert(d.errors.amountInvalid);
 
-  const note = prompt(d.labels.note, t.note || "");
+  const currentNote = typeof t.note === "string" ? t.note : "";
+  const note = prompt(d.labels.note, currentNote);
   if (note === null) return;
+  const trimmedNote = String(note).trim();
+  if (trimmedNote !== currentNote) {
+    t.note = trimmedNote.slice(0, 120);
+  }
+
+  const cat = prompt(state.lang === "de" ? "Kategorie" : "Category", t.category || uncategorizedLabel());
+  if (cat === null) return;
+  t.category = ensureCategoryExists(cat);
 
   t.dateISO = date;
   t.centsSigned = cents;
-  t.note = String(note).trim().slice(0, 120);
 
   saveState();
   renderAll();
@@ -1467,6 +1639,10 @@ function editExpensePrompt(expenseId) {
   if (newTitleRaw === null) return;
   const title = String(newTitleRaw).trim().slice(0, 80) || d.defaults.expenseTitle;
 
+  const cat = prompt(state.lang === "de" ? "Kategorie" : "Category", e.category || uncategorizedLabel());
+  if (cat === null) return;
+  const category = ensureCategoryExists(cat);
+
   const amtStr = prompt(state.lang === "de" ? "Gesamtbetrag (€)" : "Total amount (€)", String((e.totalCents / 100).toFixed(2)));
   if (amtStr === null) return;
   const totalCents = centsFromPositiveInput(amtStr);
@@ -1491,6 +1667,7 @@ function editExpensePrompt(expenseId) {
 
   const ok = rebuildExpenseAllocations(expenseId, title, totalCents, dateISO, newParticipantIds);
   if (!ok) return;
+  e.category = category;
 
   saveState();
   renderAll();
@@ -1513,21 +1690,6 @@ function deleteExpense(expenseId) {
 }
 
 /** ---------- Export / Import / Reset ---------- **/
-function exportJsonDownload() {
-  const d = dict();
-  const payload = { exportedAt: new Date().toISOString(), ...state };
-
-  const json = JSON.stringify(payload, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = d.ui.exportFilename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(a.href);
-}
-
 function importJsonFile(file) {
   const d = dict();
   const reader = new FileReader();
@@ -1539,13 +1701,15 @@ function importJsonFile(file) {
         throw new Error("bad format");
       }
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-      state = loadState();
+      const cleaned = { ...parsed };
+      delete cleaned.exportedAt;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
 
+      state = loadState();
       lastExpenseDateISO = null;
       expenseSelection.clear();
-
       renderAll();
+
     } catch {
       alert(d.errors.importFailed);
     } finally {
@@ -1608,11 +1772,13 @@ function renderAll() {
 
   renderTargetInput();
   renderDepositFamilyPicker();
+  renderCategoryPickers();
   renderExpenseChecklist();
 
   renderSummary();
   renderFamilies();
   renderLedger();
+  renderCategoryOverview();
 }
 
 /** ---------- Bindings ---------- **/
@@ -1751,7 +1917,6 @@ if (els.printReport) {
   });
 }
 
-if (els.exportBtn) els.exportBtn.addEventListener("click", exportJsonDownload);
 if (els.importInput) {
   els.importInput.addEventListener("change", (e) => {
     const file = e.target.files && e.target.files[0];
@@ -1759,6 +1924,62 @@ if (els.importInput) {
   });
 }
 if (els.resetBtn) els.resetBtn.addEventListener("click", resetAll);
+if (els.exportBtn) {
+  els.exportBtn.addEventListener("click", openExportDialog);
+}
+
+function openExportDialog() {
+  if (!els.exportDialog || !els.exportText) return;
+
+  const payload = {
+    ...state,
+    exportedAt: new Date().toISOString(),
+  };
+
+  const json = JSON.stringify(payload, null, 2);
+  els.exportText.value = json;
+
+  els.exportDialog.showModal();
+}
+
+if (els.copyExport) {
+  els.copyExport.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(els.exportText.value);
+    } catch {
+      els.exportText.focus();
+      els.exportText.select();
+      document.execCommand("copy");
+    }
+  });
+}
+
+if (els.downloadExport) {
+  els.downloadExport.addEventListener("click", () => {
+    const d = dict();
+    const json = els.exportText.value;
+
+    const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = d.ui.exportFilename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+
+    if (els.exportDialog?.open) els.exportDialog.close();
+  });
+}
+
+if (els.closeExport) {
+  els.closeExport.addEventListener("click", () => {
+    els.exportDialog.close();
+  });
+}
 
 /** ---------- init ---------- **/
 (function initFromUrl() {
