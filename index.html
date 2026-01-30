@@ -50,12 +50,7 @@
         <button class="btn" id="reminderBtn" type="button" data-i18n="reminderBtn">Reminders</button>
         <button class="btn" id="exportBtn" type="button" data-i18n="exportBtn">Export</button>
         <button class="btn" id="downloadBankCsvBtn" type="button" data-i18n="downloadBankCsvBtn" >CSV (Bank) Download</button>
-
-        <label class="btn btn--file">
-          <input id="importInput" type="file" accept="application/json" />
-          <span data-i18n="importBtn">Import</span>
-        </label>
-
+        <button class="btn" id="importBtn" type="button" data-i18n="importBtn">Import</button>
         <button class="btn btn--danger" id="resetBtn" type="button" data-i18n="resetBtn">Reset</button>
       </div>
 
@@ -445,6 +440,38 @@
       </div>
     </dialog>
 
+    <!-- Import modal -->
+    <dialog id="importDialog" class="dialog">
+      <div class="dialog__head">
+        <strong>Import</strong>
+        <button class="btn btn--icon" id="closeImport" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <p class="muted" id="importHelpText">
+        Import a previous export (.json). Your current data will be replaced in this browser.
+      </p>
+
+      <div id="importDropzone" class="dropzone" role="button" tabindex="0" aria-label="Import dropzone">
+        <div class="dropzone__title">Drop JSON here</div>
+        <div class="dropzone__sub muted">…or choose a file</div>
+      </div>
+
+      <div class="dialog__actions">
+        <button class="btn" id="importBackupExport" type="button">Export backup</button>
+
+        <label class="btn btn--file">
+          <input id="importDialogFile" type="file" accept="application/json" />
+          <span>Choose .json</span>
+        </label>
+
+        <button class="btn btn--primary" id="confirmImportBtn" type="button" disabled>
+          Import
+        </button>
+      </div>
+
+      <div class="importStatus" id="importStatus" aria-live="polite"></div>
+    </dialog>
+
     <!-- Email modal -->
     <dialog id="emailDialog" class="dialog dialog--wide">
       <div class="dialog__head">
@@ -554,7 +581,7 @@
     </dialog>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js" defer></script>
   <!-- privacy-first analytics (no cookies) -->
   <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
 </body>

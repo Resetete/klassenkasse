@@ -372,6 +372,48 @@ html[data-theme="paper"] .categoryOverview{ background: rgba(255,255,255,.65); }
 }
 .catTable th{ text-align:left; color: var(--muted); font-weight: 800; }
 
+
+/* Import dialog UX */
+.dropzone{
+  border: 2px dashed var(--stroke);
+  background: var(--card);
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .08s ease, border-color .12s ease, background .12s ease;
+  outline: none;
+}
+
+.dropzone:focus{
+  box-shadow: 0 0 0 4px rgba(255,255,255,.08);
+}
+
+.dropzone--dragover{
+  border-color: var(--text);
+  transform: scale(1.01);
+}
+
+.dropzone__title{
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.dropzone__sub{
+  font-size: 13px;
+}
+
+.importStatus{
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.importStatus--ok{ color: var(--pos); }
+.importStatus--warn{ color: var(--muted); }
+.importStatus--err{ color: var(--neg); }
+
 /* ---------- reminder UI ---------- */
 .reminderTop{
   display:flex;

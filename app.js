@@ -261,9 +261,9 @@ const I18N = {
       reportTitle: "Overview",
       printBtn: "Print / PDF",
 
-      appHeaderSubpage: "WHY Klassenkassen schnell unübersichtlich werden",
-      appSubpageExplanation: "MONEY Bargeld, WhatsApp-Nachrichten und Tabellen werden schnell chaotisch. Man verliert den Überblick, wer schon gezahlt hat und wofür das Geld ausgegeben wurde. ClassFund hält alles übersichtlich an einem Ort.",
-      appSubpageLink: "READ Lies, wie du eine Klassenkasse ohne Chaos organisierst",
+      appHeaderSubpage: "Class funds can quickly become confusing",
+      appSubpageExplanation: "Cash payments, WhatsApp messages, and spreadsheets get messy fast. It’s easy to lose track of who has already paid and what the money was spent on. ClassFund keeps everything clearly organized in one place.",
+      appSubpageLink: "Read how to organize a class fund without the chaos.",
     },
     labels: {
       deposit: "Contribution",
@@ -515,7 +515,6 @@ const els = {
   theme: document.getElementById("theme"),
   reminderBtn: document.getElementById("reminderBtn"),
   exportBtn: document.getElementById("exportBtn"),
-  importInput: document.getElementById("importInput"),
   resetBtn: document.getElementById("resetBtn"),
   exportDialog: document.getElementById("exportDialog"),
   exportText: document.getElementById("exportText"),
@@ -529,6 +528,28 @@ const els = {
   txCount: document.getElementById("txCount"),
 
   targetAmount: document.getElementById("targetAmount"),
+
+  // reminder dialog
+  reminderDialog: document.getElementById("reminderDialog"),
+  closeReminder: document.getElementById("closeReminder"),
+  reminderMode: document.getElementById("reminderMode"),
+  reminderActiveOnly: document.getElementById("reminderActiveOnly"),
+  reminderSubject: document.getElementById("reminderSubject"),
+  reminderTemplate: document.getElementById("reminderTemplate"),
+  copyAllReminders: document.getElementById("copyAllReminders"),
+  openNextReminder: document.getElementById("openNextReminder"),
+  reminderList: document.getElementById("reminderList"),
+  reminderCount: document.getElementById("reminderCount"),
+
+  // import dialog UX
+  importDialog: document.getElementById("importDialog"),
+  closeImport: document.getElementById("closeImport"),
+  importDropzone: document.getElementById("importDropzone"),
+  importDialogFile: document.getElementById("importDialogFile"),
+  confirmImportBtn: document.getElementById("confirmImportBtn"),
+  importStatus: document.getElementById("importStatus"),
+  importBackupExport: document.getElementById("importBackupExport"),
+  importBtn: document.getElementById("importBtn"),
 
   depositDate: document.getElementById("depositDate"),
   depositFamily: document.getElementById("depositFamily"),
@@ -1144,6 +1165,334 @@ function openFamilyReport(familyId) {
 function closeFamilyReport() {
   if (els.reportDialog?.open) els.reportDialog.close();
   currentReportFamilyId = null;
+}
+
+/** =========================================================
+  IMPORT DIALOG UX
+========================================================= */
+let pendingImportFile = null;
+
+function setImportStatus(msg, kind = "warn") {
+  if (!els.importStatus) return;
+  els.importStatus.textContent = msg || "";
+  els.importStatus.className = "importStatus " + (kind ? `importStatus--${kind}` : "");
+}
+
+function openImportDialog() {
+  if (!els.importDialog) return;
+
+  pendingImportFile = null;
+  if (els.confirmImportBtn) els.confirmImportBtn.disabled = true;
+
+  // language-friendly hints (simple, no full i18n yet)
+  if (document.getElementById("importHelpText")) {
+    document.getElementById("importHelpText").textContent =
+      state.lang === "de"
+        ? "Importiere einen früheren Export (.json). Die aktuellen Daten in diesem Browser werden ersetzt."
+        : "Import a previous export (.json). Your current data will be replaced in this browser.";
+  }
+
+  if (els.importDropzone) {
+    els.importDropzone.querySelector(".dropzone__title").textContent =
+      state.lang === "de" ? "JSON hier ablegen" : "Drop JSON here";
+    els.importDropzone.querySelector(".dropzone__sub").textContent =
+      state.lang === "de" ? "…oder Datei auswählen" : "…or choose a file";
+  }
+
+  setImportStatus(
+    state.lang === "de"
+      ? "Tipp: Exportiere vorher ein Backup, falls du zurück willst."
+      : "Tip: Export a backup first, if you want to be able to revert.",
+    "warn"
+  );
+
+  els.importDialog.showModal();
+}
+
+function closeImportDialog() {
+  if (els.importDialog?.open) els.importDialog.close();
+  pendingImportFile = null;
+}
+
+function setPendingImportFile(file) {
+  pendingImportFile = null;
+
+  if (!file) {
+    if (els.confirmImportBtn) els.confirmImportBtn.disabled = true;
+    setImportStatus(state.lang === "de" ? "Keine Datei ausgewählt." : "No file selected.", "warn");
+    return;
+  }
+
+  const isJson =
+    file.type === "application/json" ||
+    file.name.toLowerCase().endsWith(".json");
+
+  if (!isJson) {
+    if (els.confirmImportBtn) els.confirmImportBtn.disabled = true;
+    setImportStatus(
+      state.lang === "de" ? "Bitte eine .json Export-Datei auswählen." : "Please select a .json export file.",
+      "err"
+    );
+    return;
+  }
+
+  pendingImportFile = file;
+  if (els.confirmImportBtn) els.confirmImportBtn.disabled = false;
+
+  setImportStatus(
+    state.lang === "de"
+      ? `Ausgewählt: ${file.name} (${Math.round(file.size / 1024)} KB)`
+      : `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`,
+    "warn"
+  );
+}
+
+function doImportFromPendingFile() {
+  const d = dict();
+  if (!pendingImportFile) return;
+
+  setImportStatus(state.lang === "de" ? "Import läuft…" : "Importing…", "warn");
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || ""));
+      if (!parsed || typeof parsed !== "object") throw new Error("bad");
+
+      // accept older shapes
+      const candidate = { ...parsed };
+      delete candidate.exportedAt;
+
+      if (!candidate.tx && Array.isArray(candidate.transactions)) candidate.tx = candidate.transactions;
+      if (!Array.isArray(candidate.families)) candidate.families = [];
+      if (!Array.isArray(candidate.tx)) candidate.tx = [];
+      if (!Array.isArray(candidate.expenses)) candidate.expenses = [];
+      if (!Array.isArray(candidate.categories)) candidate.categories = defaultState().categories;
+
+      if (!candidate.lang) candidate.lang = state.lang || "en";
+      if (!candidate.theme) candidate.theme = state.theme || "minimal";
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(candidate));
+
+      state = loadState();
+      lastExpenseDateISO = null;
+      expenseSelection.clear();
+      renderAll();
+
+      setImportStatus(state.lang === "de" ? "✅ Import erfolgreich." : "✅ Import successful.", "ok");
+
+      // auto-close after short delay (UX-friendly)
+      setTimeout(() => closeImportDialog(), 500);
+
+    } catch (e) {
+      console.error("Import failed:", e);
+      setImportStatus(d.errors.importFailed || "Import failed.", "err");
+    } finally {
+      if (els.importDialogFile) els.importDialogFile.value = "";
+      pendingImportFile = null;
+      if (els.confirmImportBtn) els.confirmImportBtn.disabled = true;
+    }
+  };
+  reader.readAsText(pendingImportFile);
+}
+
+/** =========================================================
+  REMINDER DIALOG (batch)
+========================================================= */
+let reminderRecipients = [];
+let reminderCursor = 0;
+
+function defaultReminderSubject() {
+  return state.lang === "de" ? "Erinnerung: Klassenkasse" : "Reminder: Class fund";
+}
+
+function defaultReminderTemplate() {
+  if (state.lang === "de") {
+    return [
+      "Hallo {{parents}},",
+      "",
+      "kurze Erinnerung zur Klassenkasse:",
+      "Aktueller Stand: {{balance}}",
+      state.targetCents > 0 ? "Ziel: {{target}} · Fehlt noch: {{due}}" : "",
+      "",
+      "Danke & liebe Grüße",
+    ].filter(Boolean).join("\n");
+  }
+  return [
+    "Hi {{parents}},",
+    "",
+    "quick reminder about the class fund:",
+    "Current balance: {{balance}}",
+    state.targetCents > 0 ? "Target: {{target}} · Due: {{due}}" : "",
+    "",
+    "Thank you!",
+  ].filter(Boolean).join("\n");
+}
+
+function applyTemplate(template, family, balanceCents) {
+  const parents = parentsText(family);
+  const kids = childrenText(family);
+  const due = dueCents(balanceCents);
+  const target = state.targetCents || 0;
+
+  return String(template || "")
+    .replaceAll("{{parents}}", parents || "—")
+    .replaceAll("{{children}}", kids || "")
+    .replaceAll("{{balance}}", formatEUR(balanceCents))
+    .replaceAll("{{due}}", formatEUR(due))
+    .replaceAll("{{target}}", formatEUR(target))
+    .replaceAll("{{email}}", String(family?.email || ""))
+    .replaceAll("{{today}}", todayISO());
+}
+
+function buildReminderRecipients() {
+  const mode = els.reminderMode?.value || "below_target";
+  const activeOnly = !!els.reminderActiveOnly?.checked;
+
+  const balances = calcFamilyBalances();
+  const fams = state.families.slice();
+
+  const list = [];
+
+  for (const f of fams) {
+    if (activeOnly && !f.active) continue;
+
+    const bal = balances.get(f.id) || 0;
+    const due = dueCents(bal);
+
+    // only families with email make sense for mailto
+    const email = String(f.email || "").trim();
+    if (!email || !isValidEmail(email)) continue;
+
+    if (mode === "negative_only") {
+      if (bal < 0) list.push({ f, bal });
+      continue;
+    }
+
+    // below_target (default)
+    if (state.targetCents > 0) {
+      if (due > 0) list.push({ f, bal });
+    } else {
+      // if no target set, fallback: remind only negative
+      if (bal < 0) list.push({ f, bal });
+    }
+  }
+
+  // sort: biggest due/most negative first
+  list.sort((a, b) => {
+    const aScore = state.targetCents > 0 ? dueCents(a.bal) : Math.abs(Math.min(0, a.bal));
+    const bScore = state.targetCents > 0 ? dueCents(b.bal) : Math.abs(Math.min(0, b.bal));
+    return (bScore - aScore) || familyDisplayName(a.f).localeCompare(familyDisplayName(b.f));
+  });
+
+  return list;
+}
+
+function renderReminderList() {
+  if (!els.reminderList) return;
+
+  const template = els.reminderTemplate?.value || defaultReminderTemplate();
+  const subject = els.reminderSubject?.value || defaultReminderSubject();
+
+  els.reminderList.innerHTML = "";
+
+  reminderRecipients.forEach((it, idx) => {
+    const row = document.createElement("div");
+    row.className = "reminderRow";
+
+    const left = document.createElement("div");
+    left.className = "reminderRow__left";
+
+    const title = document.createElement("div");
+    title.style.fontWeight = "800";
+    title.textContent = `${familyDisplayName(it.f)} · ${it.f.email}`;
+
+    const meta = document.createElement("div");
+    meta.className = "muted small";
+    const due = dueCents(it.bal);
+    meta.textContent =
+      state.targetCents > 0
+        ? `${state.lang === "de" ? "Saldo" : "Balance"}: ${formatEUR(it.bal)} · ${state.lang === "de" ? "Fehlt" : "Due"}: ${formatEUR(due)}`
+        : `${state.lang === "de" ? "Saldo" : "Balance"}: ${formatEUR(it.bal)}`;
+
+    left.appendChild(title);
+    left.appendChild(meta);
+
+    const btn = document.createElement("button");
+    btn.className = "btn btn--primary";
+    btn.type = "button";
+    btn.textContent = state.lang === "de" ? "Öffnen" : "Open";
+    btn.addEventListener("click", () => {
+      reminderCursor = idx;
+      openCurrentReminder(subject, template);
+      renderReminderList(); // refresh highlight
+    });
+
+    if (idx === reminderCursor) {
+      row.style.outline = "2px solid var(--stroke)";
+      row.style.borderRadius = "12px";
+      row.style.padding = "10px";
+    } else {
+      row.style.padding = "10px";
+    }
+
+    row.style.display = "flex";
+    row.style.justifyContent = "space-between";
+    row.style.gap = "12px";
+    row.appendChild(left);
+    row.appendChild(btn);
+
+    els.reminderList.appendChild(row);
+  });
+
+  if (els.reminderCount) {
+    els.reminderCount.textContent =
+      state.lang === "de"
+        ? `${reminderRecipients.length} Empfänger:innen`
+        : `${reminderRecipients.length} recipients`;
+  }
+}
+
+function openCurrentReminder(subject, template) {
+  const it = reminderRecipients[reminderCursor];
+  if (!it) return;
+
+  const body = applyTemplate(template, it.f, it.bal);
+
+  const mailto =
+    `mailto:${encodeURIComponent(it.f.email)}` +
+    `?subject=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+
+  window.location.href = mailto;
+}
+
+function openReminderDialog() {
+  if (!els.reminderDialog) return;
+
+  // Defaults if empty
+  if (els.reminderSubject && !String(els.reminderSubject.value || "").trim()) {
+    els.reminderSubject.value = defaultReminderSubject();
+  }
+  if (els.reminderTemplate && !String(els.reminderTemplate.value || "").trim()) {
+    els.reminderTemplate.value = defaultReminderTemplate();
+  }
+
+  reminderRecipients = buildReminderRecipients();
+  reminderCursor = 0;
+
+  renderReminderList();
+  els.reminderDialog.showModal();
+}
+
+function refreshReminderDialog() {
+  reminderRecipients = buildReminderRecipients();
+  reminderCursor = Math.min(reminderCursor, Math.max(0, reminderRecipients.length - 1));
+  renderReminderList();
+}
+
+function closeReminderDialog() {
+  if (els.reminderDialog?.open) els.reminderDialog.close();
 }
 
 /** =========================================================
@@ -2019,35 +2368,6 @@ function deleteExpense(expenseId) {
 }
 
 /** ---------- Export / Import / Reset ---------- **/
-function importJsonFile(file) {
-  const d = dict();
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const parsed = JSON.parse(String(reader.result || ""));
-      if (!parsed || typeof parsed !== "object") throw new Error("bad");
-      if (!Array.isArray(parsed.families) || !Array.isArray(parsed.tx) || !Array.isArray(parsed.expenses)) {
-        throw new Error("bad format");
-      }
-
-      const cleaned = { ...parsed };
-      delete cleaned.exportedAt;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-
-      state = loadState();
-      lastExpenseDateISO = null;
-      expenseSelection.clear();
-      renderAll();
-
-    } catch {
-      alert(d.errors.importFailed);
-    } finally {
-      if (els.importInput) els.importInput.value = "";
-    }
-  };
-  reader.readAsText(file);
-}
-
 function resetAll() {
   const d = dict();
   const ok = confirm(d.errors.confirmReset);
@@ -2259,18 +2579,141 @@ if (els.printReport) {
     w.document.close();
   });
 }
+if (els.importBtn) els.importBtn.addEventListener("click", openImportDialog);
+// Import dialog bindings
+if (els.closeImport) els.closeImport.addEventListener("click", closeImportDialog);
 
-if (els.importInput) {
-  els.importInput.addEventListener("change", (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (file) importJsonFile(file);
+if (els.importDialog) {
+  els.importDialog.addEventListener("click", (e) => {
+    if (e.target === els.importDialog) closeImportDialog();
   });
 }
+
+// Reminder dialog open/close
+if (els.reminderBtn) els.reminderBtn.addEventListener("click", openReminderDialog);
+if (els.closeReminder) els.closeReminder.addEventListener("click", closeReminderDialog);
+
+if (els.reminderDialog) {
+  els.reminderDialog.addEventListener("click", (e) => {
+    if (e.target === els.reminderDialog) closeReminderDialog();
+  });
+}
+
+// Refresh list when criteria changes
+if (els.reminderMode) els.reminderMode.addEventListener("change", refreshReminderDialog);
+if (els.reminderActiveOnly) els.reminderActiveOnly.addEventListener("change", refreshReminderDialog);
+
+// Keep list up-to-date when user edits subject/template
+if (els.reminderSubject) els.reminderSubject.addEventListener("input", renderReminderList);
+if (els.reminderTemplate) els.reminderTemplate.addEventListener("input", renderReminderList);
+
+// Open next email
+if (els.openNextReminder) {
+  els.openNextReminder.addEventListener("click", () => {
+    if (!reminderRecipients.length) return;
+    const subject = els.reminderSubject?.value || defaultReminderSubject();
+    const template = els.reminderTemplate?.value || defaultReminderTemplate();
+
+    openCurrentReminder(subject, template);
+
+    // advance cursor (wrap)
+    reminderCursor = (reminderCursor + 1) % reminderRecipients.length;
+    renderReminderList();
+  });
+}
+
+// Copy all reminders as text blocks
+if (els.copyAllReminders) {
+  els.copyAllReminders.addEventListener("click", async () => {
+    if (!reminderRecipients.length) return;
+
+    const subject = els.reminderSubject?.value || defaultReminderSubject();
+    const template = els.reminderTemplate?.value || defaultReminderTemplate();
+
+    const blocks = reminderRecipients.map((it) => {
+      const body = applyTemplate(template, it.f, it.bal);
+      return [
+        `---`,
+        `TO: ${it.f.email}`,
+        `SUBJECT: ${subject}`,
+        ``,
+        body,
+        ``,
+      ].join("\n");
+    }).join("\n");
+
+    try {
+      await navigator.clipboard.writeText(blocks);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = blocks;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+  });
+}
+
+if (els.importBackupExport) {
+  els.importBackupExport.addEventListener("click", () => {
+    // reuse export dialog flow
+    openExportDialog();
+    setImportStatus(
+      state.lang === "de"
+        ? "Backup-Export geöffnet. Danach kannst du hier importieren."
+        : "Backup export opened. You can import here afterwards.",
+      "warn"
+    );
+  });
+}
+
+if (els.importDialogFile) {
+  els.importDialogFile.addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    setPendingImportFile(file);
+  });
+}
+
+if (els.confirmImportBtn) {
+  els.confirmImportBtn.addEventListener("click", doImportFromPendingFile);
+}
+
+if (els.importDropzone) {
+  // click -> open file chooser
+  els.importDropzone.addEventListener("click", () => els.importDialogFile?.click());
+
+  // keyboard accessibility
+  els.importDropzone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") els.importDialogFile?.click();
+  });
+
+  // drag/drop
+  ["dragenter", "dragover"].forEach((ev) => {
+    els.importDropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      els.importDropzone.classList.add("dropzone--dragover");
+    });
+  });
+
+  ["dragleave", "drop"].forEach((ev) => {
+    els.importDropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      els.importDropzone.classList.remove("dropzone--dragover");
+    });
+  });
+
+  els.importDropzone.addEventListener("drop", (e) => {
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file) return;
+    setPendingImportFile(file);
+  });
+}
+
 if (els.resetBtn) els.resetBtn.addEventListener("click", resetAll);
 if (els.exportBtn) {
   els.exportBtn.addEventListener("click", openExportDialog);
 }
-
 
 // Export Entries Data
 function openExportDialog() {
