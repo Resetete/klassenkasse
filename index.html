@@ -180,15 +180,15 @@
         </div>
 
         <div class="field">
-          <label>Auswahl</label>
+          <label data-i18n="familySelectionRadioTitle">Auswahl</label>
           <div class="radio">
             <label style="display:flex; gap:8px; align-items:center;">
               <input type="radio" name="expenseMode" id="expenseModeAll" />
-              <span>Alle Familien auswählen</span>
+              <span data-i18n="selectAllFamilies">Alle Familien auswählen</span>
             </label>
-            <label style="display:flex; gap:8px; align-items:center; margin-left:14px;">
+            <label style="display:flex; gap:8px; align-items:center">
               <input type="radio" name="expenseMode" id="expenseModeCustom" />
-              <span>Nur ausgewählte Familien</span>
+              <span data-i18n="selectFamilies">Nur ausgewählte Familien</span>
             </label>
           </div>
         </div>
@@ -215,7 +215,7 @@
         <details id="familyFormDetails" class="detailsCard">
           <summary class="detailsSummary">
             <span data-i18n="addFamilyTitle">Add family</span>
-            <span class="muted small" data-i18n="familyRareHint">(rarely needed – new family joins)</span>
+            <span class="muted small" data-i18n="familyRareHint">(Use this to add new families when they join the class)</span>
           </summary>
 
           <div class="detailsBody">
@@ -279,12 +279,18 @@
 
         <hr class="hr" />
 
-        <h2 data-i18n="ledgerTitle">History</h2>
-        <div id="ledger" class="ledger"></div>
+        <details id="ledgerHistoryDetails" class="detailsCard">
+          <summary class="detailsSummary">
+            <span data-i18n="ledgerTitle">History of Transactions</span>
+            <span class="muted small" data-i18n="ledgerHistoryHint">(Use this to add new families when they join the class)</span>
+          </summary>
 
-        <p class="empty muted" id="emptyState" hidden data-i18n="emptyState">
-          No transactions yet.
-        </p>
+          <div id="ledger" class="ledger"></div>
+
+          <p class="empty muted" id="emptyState" hidden data-i18n="emptyState">
+            No transactions yet.
+          </p>
+          </details>
       </section>
     </main>
 
@@ -405,7 +411,7 @@
         <div class="footer-meta">
           <span>© 2026 Theresa Mannschatz</span>
           <span class="footer-sep">·</span>
-          <a id="imprint-link" href="../pages/en/imprint.html">Imprint</a>
+          <a id="imprint-link" href="../pages/en/imprint.html" data-i18n="imprint">Imprint</a>
         </div>
       </div>
     </footer>
