@@ -49,6 +49,7 @@
 
         <button class="btn" id="reminderBtn" type="button" data-i18n="reminderBtn">Reminders</button>
         <button class="btn" id="exportBtn" type="button" data-i18n="exportBtn">Export</button>
+        <button class="btn" id="downloadBankCsvBtn" type="button" data-i18n="downloadBankCsvBtn" >CSV (Bank) Download</button>
 
         <label class="btn btn--file">
           <input id="importInput" type="file" accept="application/json" />
@@ -292,6 +293,129 @@
       </section>
     </main>
 
+    <!-- SEO + Privacy -->
+      <section class="seo-privacy" aria-label="Privacy and data protection">
+        <div data-lang="en">
+          <h2>Privacy-friendly & GDPR compliant</h2>
+          <p>
+            This class fund app is completely free and runs entirely in your browser.
+            No accounts, no cloud storage, and no app data is sent to a server.
+          </p>
+          <p>
+            Your class fund data is stored locally in your browser (local storage).
+            This makes the app privacy-friendly and GDPR compliant for parent groups, classes and schools.
+          </p>
+          <p>
+            Important: local browser storage can be deleted (for example when you clear website data, use private browsing,
+            change devices, or reinstall the browser). Please export regular backups to avoid data loss.
+          </p>
+
+          <p class="small muted">
+            This website uses privacy-friendly analytics (no cookies).
+          </p>
+        </div>
+
+        <div data-lang="de">
+          <h2>Datenschutzfreundlich & DSGVO-konform</h2>
+          <p>
+            Diese Klassenkassen-App ist komplett kostenlos und läuft vollständig in deinem Browser.
+            Kein Login, keine Cloud — und die App-Daten werden nicht an einen Server übertragen.
+          </p>
+          <p>
+            Deine Klassenkassen-Daten werden lokal im Browser gespeichert (Local Storage).
+            Dadurch ist die App datenschutzfreundliche und DSGVO-konform – ideal für Elterninitiativen, Klassen und Schulen.
+          </p>
+          <p>
+            Wichtig: Lokaler Browserspeicher kann gelöscht werden (z. B. beim Löschen von Website-Daten,
+            im privaten Modus, beim Gerätewechsel oder bei einer Neuinstallation). Bitte exportiere regelmäßig Backups,
+            damit keine Daten verloren gehen.
+          </p>
+
+          <p class="small muted">
+            Diese Website nutzt datenschutzfreundliche Analytics (ohne Cookies).
+          </p>
+        </div>
+      </section>
+
+      <!-- FAQ (good for SEO) -->
+      <section class="seo-faq" aria-label="FAQ">
+        <div data-lang="en">
+          <h2>FAQ</h2>
+
+          <h3>Is the app free?</h3>
+          <p>Yes — it’s completely free to use.</p>
+
+          <h3>Where is my data stored?</h3>
+          <p>Locally in your browser (local storage). No cloud account needed.</p>
+
+          <h3>Can I lose my data?</h3>
+          <p>
+            Yes. If website data is cleared or you switch devices/browsers, local storage may be removed.
+            Export backups regularly.
+          </p>
+        </div>
+
+        <div data-lang="de">
+          <h2>FAQ</h2>
+
+          <h3>Ist die App kostenlos?</h3>
+          <p>Ja — die Nutzung ist komplett kostenlos.</p>
+
+          <h3>Wo werden meine Daten gespeichert?</h3>
+          <p>Lokal im Browser (Local Storage). Du brauchst kein Cloud-Konto.</p>
+
+          <h3>Können Daten verloren gehen?</h3>
+          <p>
+            Ja. Wenn Website-Daten gelöscht werden oder du Browser/Gerät wechselst, kann der lokale Speicher entfernt werden.
+            Bitte regelmäßig exportieren.
+          </p>
+        </div>
+      </section>
+
+      <!-- SEO teaser -->
+      <section class="seo-teaser" aria-labelledby="classfund-h2">
+        <div data-lang="en">
+          <h2 id="classfund-h2" data-i18n="appHeaderSubpage">
+            Why class funds get messy fast
+          </h2>
+          <p data-i18n="appSubpageExplanation">
+            Cash, WhatsApp messages and spreadsheets break down quickly. People lose track of who paid and what the money was used for. ClassFund keeps everything clear in one place.
+          </p>
+          <a id="seoLink" href="./pages/en/class-fund-explainer.html" data-i18n="appSubpageLink">
+            Read how to run a class fund without chaos
+          </a>
+        </div>
+        <div data-lang="de">
+          <h2 id="classfund-teaser-h2-de">Warum Klassenkassen schnell unübersichtlich werden</h2>
+          <p>
+            Bargeld, WhatsApp-Nachrichten und Tabellen werden schnell chaotisch. Man verliert den Überblick, wer schon gezahlt hat
+            und wofür das Geld ausgegeben wurde. ClassFund hält alles übersichtlich an einem Ort.
+          </p>
+          <a href="/pages/de/klassenkasse-erklaerung.html">
+            Lies, wie du eine Klassenkasse ohne Chaos organisierst
+          </a>
+        </div>
+      </section>
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-container">
+        <a href="https://theresamannschatz.design" class="footer-brand" target="_blank" rel="noopener">
+          <img
+            class="footer-logo"
+            src="chamaeleon.png"
+            alt="Theresa Mannschatz – Design"
+          />
+        </a>
+
+        <div class="footer-meta">
+          <span>© 2026 Theresa Mannschatz</span>
+          <span class="footer-sep">·</span>
+          <a id="imprint-link" href="../imprint/index.html">Imprint</a>
+        </div>
+      </div>
+    </footer>
+
+
     <!-- ================= MODALS (kept for full features) ================= -->
 
     <!-- Export modal -->
@@ -428,10 +552,10 @@
         <button class="btn btn--primary" id="printReport" type="button" data-i18n="printBtn">Print / PDF</button>
       </div>
     </dialog>
-
   </div>
 
   <script src="app.js"></script>
+  <!-- privacy-first analytics (no cookies) -->
   <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
 </body>
 </html>

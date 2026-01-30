@@ -26,6 +26,7 @@ const I18N = {
       reminderBtn: "Erinnerungen",
       exportBtn: "Export",
       importBtn: "Import",
+      downloadBankCsvBtn: "CSV (Bank) Download",
       resetBtn: "Reset",
 
       summaryTitle: "Übersicht",
@@ -163,6 +164,8 @@ const I18N = {
       themeLabel: "Theme",
       reminderBtn: "Reminders",
       exportBtn: "Export",
+      downloadBankCsvBtn: "CSV (Bank) Download",
+      downloadAllCsvBtn: "CSV (All) Download",
       importBtn: "Import",
       resetBtn: "Reset",
 
@@ -295,14 +298,60 @@ const I18N = {
   },
 };
 
+const SUPPORTED_LANGS = ["de", "en"];
 function normalizeLang(lang) {
-  return lang === "de" ? "de" : "en";
+  return SUPPORTED_LANGS.includes(lang) ? lang : "en";
 }
 function dict() {
   return I18N[normalizeLang(state?.lang || "en")] || I18N.en;
 }
 
+/** ---------- language switcher helpers ---------- **/
+function setLang(lang) {
+  state.lang = normalizeLang(lang);
+  document.documentElement.lang = state.lang;
+  saveState();
+  renderAll();
+}
+
+function updateSeoLinkForLang(lang) {
+  const seoLink = document.getElementById("seoLink");
+  if (!seoLink) return;
+
+  const map = {
+    en: "/pages/en/class-fund-explainer.html",
+    de: "/pages/de/klassenkasse-erklaerung.html",
+  };
+
+  seoLink.setAttribute("href", map[lang] || map.en);
+}
+
 /** ---------- utils ---------- **/
+function downloadTextFile(filename, content, mime = "application/octet-stream") {
+  const blob = new Blob([content], { type: mime });
+
+  if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+    window.navigator.msSaveOrOpenBlob(blob, filename);
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;   // wichtig
+  a.rel = "noopener";
+  a.style.display = "none";
+  document.body.appendChild(a);
+
+  a.click();
+
+  // Safari/WebKit: später revoke, sonst "Unbenannt"
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 1500);
+}
+
 function uid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
@@ -465,6 +514,7 @@ const els = {
   copyExport: document.getElementById("copyExport"),
   downloadExport: document.getElementById("downloadExport"),
   closeExport: document.getElementById("closeExport"),
+  downloadBankCsvBtn: document.getElementById("downloadBankCsvBtn"),
 
   totalBalance: document.getElementById("totalBalance"),
   familiesCount: document.getElementById("familiesCount"),
@@ -793,6 +843,70 @@ function bankReconciliationStatus() {
   const bank = calcBankTotals();
   const status = bank.balance === 0 ? "ok" : "warn";
   return { status, diff: bank.balance };
+}
+
+function buildBankCsvRows() {
+  // Bank-relevant: deposits (tx deposit) + expenses (expenses list)
+  const rows = [];
+
+  // Deposits
+  for (const t of state.tx) {
+    if (t.type !== "deposit") continue;
+    const f = familyById(t.familyId);
+    rows.push({
+      kind: "DEPOSIT",
+      dateISO: t.dateISO,
+      amountEUR: eurNumber(t.centsSigned),
+      note: t.note || "",
+      category: t.category || "",
+      family: familyDisplayName(f || {}),
+      familyId: t.familyId || "",
+      id: t.id || "",
+      createdAt: t.createdAt || "",
+    });
+  }
+
+  // Expenses (as they appear on bank)
+  for (const e of state.expenses) {
+    rows.push({
+      kind: "EXPENSE",
+      dateISO: e.dateISO,
+      amountEUR: eurNumber(-Math.abs(e.totalCents || 0)), // negative
+      note: e.title || "",
+      category: e.category || "",
+      family: "",     // n/a on bank level
+      familyId: "",   // n/a
+      id: e.id || "",
+      createdAt: e.createdAt || "",
+    });
+  }
+
+  // Sort by date desc, then createdAt desc
+  rows.sort((a, b) => (b.dateISO.localeCompare(a.dateISO) || (Number(b.createdAt) - Number(a.createdAt))));
+
+  return rows;
+}
+
+function downloadBankCsv() {
+  const rows = buildBankCsvRows();
+
+  const headers = [
+    "kind",        // DEPOSIT / EXPENSE
+    "dateISO",
+    "amountEUR",   // deposits positive, expenses negative
+    "note",        // deposit note OR expense title
+    "category",
+    "family",
+    "familyId",
+    "id",
+    "createdAt",
+  ];
+
+  const data = rows.map(r => headers.map(h => r[h] ?? ""));
+  const csv = toCsv(data, headers, ";");
+
+  const filename = `classfund-bank-${todayISO()}.csv`;
+  downloadTextFile(filename, csv);
 }
 
 
@@ -1943,6 +2057,13 @@ function applyLang() {
   document.documentElement.lang = state.lang;
 }
 
+function applyLangVisibility() {
+  const lang = normalizeLang(state.lang);
+  document.querySelectorAll("[data-lang]").forEach((el) => {
+    el.hidden = el.getAttribute("data-lang") !== lang;
+  });
+}
+
 function t(key) {
   const d = dict();
   return (d.text && d.text[key]) || key;
@@ -1963,6 +2084,8 @@ function applyI18n() {
 function renderAll() {
   applyLang();
   applyI18n();
+  updateSeoLinkForLang(state.lang); // language-aware explainer link (if #seoLink exists)
+  applyLangVisibility(); // controls SEO+FAQ blocks
   applyTheme();
 
   if (els.lang) els.lang.value = state.lang;
@@ -1988,9 +2111,7 @@ function renderAll() {
 /** ---------- Bindings ---------- **/
 if (els.lang) {
   els.lang.addEventListener("change", () => {
-    state.lang = normalizeLang(els.lang.value);
-    saveState();
-    renderAll();
+    setLang(els.lang.value);
   });
 }
 if (els.theme) {
@@ -2049,6 +2170,10 @@ if (els.children) {
   els.children.addEventListener("keydown", (e) => {
     if (e.key === "Enter") addFamilyFromForm();
   });
+}
+
+if (els.downloadBankCsvBtn) {
+  els.downloadBankCsvBtn.addEventListener("click", downloadBankCsv);
 }
 
 /** mode toggles */
@@ -2132,17 +2257,13 @@ if (els.exportBtn) {
   els.exportBtn.addEventListener("click", openExportDialog);
 }
 
+
+// Export Entries Data
 function openExportDialog() {
   if (!els.exportDialog || !els.exportText) return;
 
-  const payload = {
-    ...state,
-    exportedAt: new Date().toISOString(),
-  };
-
-  const json = JSON.stringify(payload, null, 2);
-  els.exportText.value = json;
-
+  const payload = { ...state, exportedAt: new Date().toISOString() };
+  els.exportText.value = JSON.stringify(payload, null, 2);
   els.exportDialog.showModal();
 }
 
@@ -2159,23 +2280,14 @@ if (els.copyExport) {
 }
 
 if (els.downloadExport) {
-  els.downloadExport.addEventListener("click", () => {
+  els.downloadExport.addEventListener("click", (e) => {
+    e.preventDefault(); // wichtig, falls Button in <form>
     const d = dict();
-    const json = els.exportText.value;
+    const json = String(els.exportText?.value || "");
+    if (!json.trim()) return alert(state.lang === "de" ? "Export ist leer – bitte erst Export öffnen." : "Export is empty – open export first.");
 
-    const blob = new Blob([json], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = d.ui.exportFilename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    URL.revokeObjectURL(url);
-
-    if (els.exportDialog?.open) els.exportDialog.close();
+    const filename = (d?.ui?.exportFilename || "klassenkasse-export.json");
+    downloadTextFile(filename, json, "application/json;charset=utf-8");
   });
 }
 
@@ -2185,9 +2297,28 @@ if (els.closeExport) {
   });
 }
 
+// Export Transaction history
+function csvEscape(value) {
+  const s = String(value ?? "");
+  return `"${s.replaceAll('"', '""')}"`;
+}
+
+function toCsv(rows, headers, separator = ";") {
+  const head = headers.map(csvEscape).join(separator);
+  const body = rows.map(r => r.map(csvEscape).join(separator)).join("\n");
+  // UTF-8 BOM helps Excel (DE) to read umlauts correctly
+  return "\ufeff" + head + "\n" + body + "\n";
+}
+
+function eurNumber(cents) {
+  // for CSV: numeric string without currency symbol; DE uses comma, but Excel usually handles either.
+  return ((cents || 0) / 100).toFixed(2);
+}
+
 /** ---------- init ---------- **/
-(function initFromUrl() {
+(function initLangFromUrl(){
   const urlLang = new URLSearchParams(location.search).get("lang");
   if (urlLang) state.lang = normalizeLang(urlLang);
 })();
+
 renderAll();
