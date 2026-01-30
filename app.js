@@ -66,7 +66,7 @@ const I18N = {
       roundingHint: "Cent-Reste werden fair verteilt.",
 
       addFamilyTitle: "Familie hinzufügen",
-      familyRareHint: "(selten nötig – neue Familie kommt dazu)",
+      familyRareHint: "Nutze dies, wenn eine neue Familie dazu kommt",
       parent1Label: "Elternteil 1",
       phParent1: "Name",
       parent2Label: "Elternteil 2 (optional)",
@@ -84,7 +84,8 @@ const I18N = {
       familyHint: "Tipp: Inaktive Familien werden aus Auswahlfeldern ausgeschlossen, bleiben aber in der Historie.",
 
       familiesTitle: "Familien",
-      ledgerTitle: "Historie",
+      ledgerTitle: "Buchungs-Historie",
+      ledgerHistoryHint: "Liste aller Ein- und Ausgaben",
       emptyState: "Noch keine Buchungen.",
 
       exportTitle: "Export",
@@ -210,7 +211,7 @@ const I18N = {
       roundingHint: "Cent remainders are distributed fairly.",
 
       addFamilyTitle: "Add family",
-      familyRareHint: "(rarely needed – new family joins)",
+      familyRareHint: "Use this to add new families when they join the class",
       parent1Label: "Parent 1",
       phParent1: "Name",
       parent2Label: "Parent 2 (optional)",
@@ -228,7 +229,8 @@ const I18N = {
       familyHint: "Tip: inactive families are excluded from selections, but remain in history.",
 
       familiesTitle: "Families",
-      ledgerTitle: "History",
+      ledgerTitle: "History of transactions",
+      ledgerHistoryHint: "List of all deposits and expenses",
       emptyState: "No transactions yet.",
 
       exportTitle: "Export",
