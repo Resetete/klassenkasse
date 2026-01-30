@@ -551,6 +551,12 @@ const els = {
   importBackupExport: document.getElementById("importBackupExport"),
   importBtn: document.getElementById("importBtn"),
 
+  // Reset confirm modal (UI)
+  confirmDialog: document.getElementById("confirmDialog"),
+  closeConfirm: document.getElementById("closeConfirm"),
+  cancelReset: document.getElementById("cancelReset"),
+  confirmReset: document.getElementById("confirmReset"),
+
   depositDate: document.getElementById("depositDate"),
   depositFamily: document.getElementById("depositFamily"),
   depositAmount: document.getElementById("depositAmount"),
@@ -2368,11 +2374,7 @@ function deleteExpense(expenseId) {
 }
 
 /** ---------- Export / Import / Reset ---------- **/
-function resetAll() {
-  const d = dict();
-  const ok = confirm(d.errors.confirmReset);
-  if (!ok) return;
-
+function resetAllNow() {
   localStorage.removeItem(STORAGE_KEY);
   state = defaultState();
   saveState();
@@ -2381,6 +2383,19 @@ function resetAll() {
   expenseSelection.clear();
 
   renderAll();
+}
+
+function openResetConfirmDialog() {
+  if (!els.confirmDialog) return;
+
+  // optional: i18n text im Dialog aktualisieren (falls du data-i18n nutzt, ist das eh drin)
+  // aber falls du "hardcoded" Text drin hast, bleibt es so ok.
+
+  els.confirmDialog.showModal();
+}
+
+function closeResetConfirmDialog() {
+  if (els.confirmDialog?.open) els.confirmDialog.close();
 }
 
 /** ---------- Render all ---------- **/
@@ -2710,9 +2725,27 @@ if (els.importDropzone) {
   });
 }
 
-if (els.resetBtn) els.resetBtn.addEventListener("click", resetAll);
+if (els.resetBtn) els.resetBtn.addEventListener("click", openResetConfirmDialog);
 if (els.exportBtn) {
   els.exportBtn.addEventListener("click", openExportDialog);
+}
+
+// Reset confirm dialog wiring (UI modal)
+if (els.closeConfirm) els.closeConfirm.addEventListener("click", closeResetConfirmDialog);
+if (els.cancelReset) els.cancelReset.addEventListener("click", closeResetConfirmDialog);
+
+if (els.confirmReset) {
+  els.confirmReset.addEventListener("click", () => {
+    resetAllNow();
+    closeResetConfirmDialog();
+  });
+}
+
+if (els.confirmDialog) {
+  // click on backdrop closes (same pattern as other dialogs)
+  els.confirmDialog.addEventListener("click", (e) => {
+    if (e.target === els.confirmDialog) closeResetConfirmDialog();
+  });
 }
 
 // Export Entries Data
