@@ -66,6 +66,9 @@ const I18N = {
       roundingHint: "Cent-Reste werden fair verteilt.",
 
       addFamilyTitle: "Familie hinzufügen",
+      familySelectionRadioTitle: "Auswahl",
+      selectAllFamilies: "Alle Familien auswählen",
+      selectFamilies: "Nur ausgewählte Familien",
       familyRareHint: "Nutze dies, wenn eine neue Familie dazu kommt",
       parent1Label: "Elternteil 1",
       phParent1: "Name",
@@ -84,7 +87,7 @@ const I18N = {
       familyHint: "Tipp: Inaktive Familien werden aus Auswahlfeldern ausgeschlossen, bleiben aber in der Historie.",
 
       familiesTitle: "Familien",
-      ledgerTitle: "Buchungs-Historie",
+      ledgerTitle: "Buchungsverlauf",
       ledgerHistoryHint: "Liste aller Ein- und Ausgaben",
       emptyState: "Noch keine Buchungen.",
 
@@ -121,6 +124,7 @@ const I18N = {
       appHeaderSubpage: "Warum Klassenkassen schnell unübersichtlich werden",
       appSubpageExplanation: "Bargeld, WhatsApp-Nachrichten und Tabellen werden schnell chaotisch. Man verliert den Überblick, wer schon gezahlt hat und wofür das Geld ausgegeben wurde. ClassFund hält alles übersichtlich an einem Ort.",
       appSubpageLink: "Lies, wie du eine Klassenkasse ohne Chaos organisierst",
+      imprint: "Impressum",
     },
     labels: {
       deposit: "Einzahlung",
@@ -212,6 +216,9 @@ const I18N = {
 
       addFamilyTitle: "Add family",
       familyRareHint: "Use this to add new families when they join the class",
+      familySelectionRadioTitle: "Selection",
+      selectAllFamilies: "Select all families",
+      selectFamilies: "Select specific families",
       parent1Label: "Parent 1",
       phParent1: "Name",
       parent2Label: "Parent 2 (optional)",
@@ -266,6 +273,7 @@ const I18N = {
       appHeaderSubpage: "Class funds can quickly become confusing",
       appSubpageExplanation: "Cash payments, WhatsApp messages, and spreadsheets get messy fast. It’s easy to lose track of who has already paid and what the money was spent on. ClassFund keeps everything clearly organized in one place.",
       appSubpageLink: "Read how to organize a class fund without the chaos.",
+      imprint: "Imprint",
     },
     labels: {
       deposit: "Contribution",
