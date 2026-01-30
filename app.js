@@ -32,6 +32,9 @@ const I18N = {
       totalBalanceLabel: "Gesamtsaldo",
       familiesCountLabel: "Familien",
       txCountLabel: "Buchungen",
+      bankDeposits: "Einzahlungen (Bank)",
+      bankExpenses: "Ausgaben (Bank)",
+      bankBalance: "Kontostand Bank",
 
       settingsTitle: "Einstellungen",
       targetAmountLabel: "Zielbetrag pro Familie (€)",
@@ -167,6 +170,9 @@ const I18N = {
       totalBalanceLabel: "Total balance",
       familiesCountLabel: "Families",
       txCountLabel: "Transactions",
+      bankDeposits: "Deposits (bank)",
+      bankExpenses: "Expenses (bank)",
+      bankBalance: "Bank balance",
 
       settingsTitle: "Settings",
       targetAmountLabel: "Target amount per family (€)",
@@ -675,23 +681,171 @@ function rebuildExpenseAllocations(expenseId, newTitle, newTotalCents, newDateIS
   return true;
 }
 
+/** =========================================================
 /** ---------- balances ---------- **/
+/** =========================================================*/
+
 function calcBalances() {
+  // Per-family balances only for families that still exist in state.families
   const byFamily = new Map(state.families.map((f) => [f.id, 0]));
+
+  // Total should reflect *all* tx rows, even if a family was deleted/missing
   let total = 0;
 
+  // Optional diagnostics: tx entries referencing missing families
+  let orphanTxCount = 0;
+  let orphanCentsTotal = 0;
+
   for (const t of state.tx) {
-    if (!t.familyId) continue;
-    if (!byFamily.has(t.familyId)) continue;
-    byFamily.set(t.familyId, byFamily.get(t.familyId) + (t.centsSigned || 0));
-    total += t.centsSigned || 0;
+    const v = t?.centsSigned || 0;
+
+    // TOTAL: always include every tx
+    total += v;
+
+    const fid = t?.familyId;
+    if (!fid || !byFamily.has(fid)) {
+      orphanTxCount += 1;
+      orphanCentsTotal += v;
+      continue;
+    }
+
+    byFamily.set(fid, byFamily.get(fid) + v);
   }
-  return { byFamily, total };
+
+  return { byFamily, total, orphanTxCount, orphanCentsTotal };
 }
 
+function calcBankTotals() {
+  let deposits = 0;
+  let expenses = 0;
+
+  for (const t of state.tx) {
+    if (t.type === "deposit") {
+      deposits += t.centsSigned || 0;
+    }
+  }
+
+  for (const e of state.expenses) {
+    expenses += e.totalCents || 0;
+  }
+
+  const balance = deposits - expenses;
+  return { deposits, expenses, balance };
+}
+
+function calcFamilyBalances() {
+  const byFamily = new Map(state.families.map((f) => [f.id, 0]));
+
+  for (const t of state.tx) {
+    if (!byFamily.has(t.familyId)) continue;
+    byFamily.set(t.familyId, byFamily.get(t.familyId) + (t.centsSigned || 0));
+  }
+
+  return byFamily;
+}
+
+function detectDuplicateBankEntries() {
+  const seen = new Set();
+  const duplicates = [];
+
+  // Deposits
+  for (const t of state.tx.filter(t => t.type === "deposit")) {
+    const key = `D|${t.dateISO}|${t.centsSigned}|${t.note || ""}|${t.familyId}`;
+    if (seen.has(key)) duplicates.push(key);
+    seen.add(key);
+  }
+
+  // Expenses
+  for (const e of state.expenses) {
+    const key = `E|${e.dateISO}|${e.totalCents}|${e.title || ""}`;
+    if (seen.has(key)) duplicates.push(key);
+    seen.add(key);
+  }
+
+  return duplicates;
+}
+
+function isDuplicateDeposit(dateISO, cents, note) {
+  return state.tx.some(t =>
+    t.type === "deposit" &&
+    t.dateISO === dateISO &&
+    t.centsSigned === cents &&
+    (t.note || "") === (note || "")
+  );
+}
+
+// Duplicates check
+let duplicateWarningShown = false;
+function warnIfDuplicatesOnce() {
+  if (duplicateWarningShown) return;
+  const dups = detectDuplicateBankEntries();
+  if (dups.length === 0) return;
+
+  duplicateWarningShown = true;
+  alert(
+    state.lang === "de"
+      ? `⚠️ Achtung: ${dups.length} mögliche doppelte Bankbuchungen erkannt.`
+      : `⚠️ Warning: ${dups.length} possible duplicate bank entries detected.`
+  );
+}
+
+function bankReconciliationStatus() {
+  const bank = calcBankTotals();
+  const status = bank.balance === 0 ? "ok" : "warn";
+  return { status, diff: bank.balance };
+}
+
+
 /** =========================================================
-    NEW: FAMILY OVERVIEW POPUP (reportDialog)
-    ========================================================= */
+DEBUG: find orphan / suspicious transactions
+ ========================================================= */
+function debugFindSuspiciousTransactions() {
+  const familiesById = new Set(state.families.map(f => f.id));
+
+  const rows = state.tx.map(t => {
+    const familyExists = t.familyId && familiesById.has(t.familyId);
+
+    return {
+      id: t.id,
+      type: t.type,
+      date: t.dateISO,
+      centsSigned: t.centsSigned,
+      amountEUR: formatEUR(t.centsSigned),
+      familyId: t.familyId || "—",
+      familyExists,
+      note: t.note || "",
+      expenseId: t.expenseId || null,
+    };
+  });
+
+  const orphanTx = rows.filter(r => !r.familyExists);
+  const orphanSum = orphanTx.reduce((s, r) => s + r.centsSigned, 0);
+
+  console.group("🧪 ClassFund Debug — suspicious transactions");
+
+  console.log("All transactions:", rows.length);
+  console.log("Orphan transactions (missing family):", orphanTx.length);
+  console.log("Orphan total:", formatEUR(orphanSum));
+
+  if (orphanTx.length > 0) {
+    console.table(orphanTx);
+  } else {
+    console.log("✅ No orphan transactions found.");
+  }
+
+  console.groupEnd();
+
+  return {
+    orphanTx,
+    orphanSum,
+    totalTxCount: rows.length,
+  };
+}
+
+
+/** =========================================================
+  FAMILY OVERVIEW POPUP (reportDialog)
+========================================================= */
 let currentReportFamilyId = null;
 
 function familyTxItems(familyId) {
@@ -1060,16 +1214,54 @@ function renderDepositFamilyPicker() {
 
 /** ---------- Summary render ---------- **/
 function renderSummary() {
-  const { total } = calcBalances();
-  const activeCount = (state.families || []).filter((f) => f && f.active).length;
+  const bank = calcBankTotals();                 // deposits - expenses
+  const { total, orphanTxCount, orphanCentsTotal } = calcBalances(); // sum(tx)
 
-  if (els.totalBalance) els.totalBalance.textContent = formatEUR(total);
-  if (els.familiesCount) els.familiesCount.textContent = String(activeCount);
+  // show BANK truth as main number
+  if (els.totalBalance) {
+    els.totalBalance.textContent = formatEUR(bank.balance);
+    els.totalBalance.style.color =
+      bank.balance < 0 ? "var(--neg)" :
+      bank.balance > 0 ? "var(--pos)" :
+      "var(--text)";
+  }
+
+  if (els.familiesCount) els.familiesCount.textContent = String(state.families.length);
   if (els.txCount) els.txCount.textContent = String(state.tx.length);
 
+  // Tooltip diagnostics
   if (els.totalBalance) {
-    els.totalBalance.style.color = total < 0 ? "var(--neg)" : total > 0 ? "var(--pos)" : "var(--text)";
+    const hints = [];
+
+    // orphan warning (transactions referencing missing families)
+    if (orphanTxCount > 0) {
+      hints.push(
+        state.lang === "de"
+          ? `Hinweis: ${orphanTxCount} Buchung(en) referenzieren keine vorhandene Familie (Summe: ${formatEUR(orphanCentsTotal)}).`
+          : `Note: ${orphanTxCount} transaction(s) reference a missing family (sum: ${formatEUR(orphanCentsTotal)}).`
+      );
+    }
+
+    // consistency check: bank.balance should equal total tx sum
+    const diff = bank.balance - total;
+    if (diff !== 0) {
+      hints.push(
+        state.lang === "de"
+          ? `⚠️ Abweichung: Bank-Saldo (${formatEUR(bank.balance)}) ≠ TX-Summe (${formatEUR(total)}). Diff: ${formatEUR(diff)}.`
+          : `⚠️ Mismatch: Bank balance (${formatEUR(bank.balance)}) ≠ TX sum (${formatEUR(total)}). Diff: ${formatEUR(diff)}.`
+      );
+    }
+
+    els.totalBalance.title = hints.join("\n");
   }
+}
+
+function renderBankSummary() {
+  const bank = calcBankTotals();
+
+  document.getElementById("bankDeposits").textContent = formatEUR(bank.deposits);
+  document.getElementById("bankExpenses").textContent = formatEUR(bank.expenses);
+  document.getElementById("bankBalance").textContent = formatEUR(bank.balance);
 }
 
 /** ---------- Families list (minimal) ---------- **/
@@ -1483,6 +1675,15 @@ function addDeposit() {
   const note = String(els.depositNote?.value || "").trim().slice(0, 120);
   const category = ensureCategoryExists(els.depositCategory?.value);
 
+  if (isDuplicateDeposit(dateISO, cents, note)) {
+    const ok = confirm(
+      state.lang === "de"
+        ? "Diese Einzahlung sieht identisch zu einer bestehenden aus. Trotzdem speichern?"
+        : "This deposit looks identical to an existing one. Save anyway?"
+    );
+    if (!ok) return;
+  }
+
   state.tx.push({
     id: uid(),
     type: "deposit",
@@ -1776,9 +1977,12 @@ function renderAll() {
   renderExpenseChecklist();
 
   renderSummary();
+  renderBankSummary();
   renderFamilies();
   renderLedger();
   renderCategoryOverview();
+
+  warnIfDuplicatesOnce();
 }
 
 /** ---------- Bindings ---------- **/
