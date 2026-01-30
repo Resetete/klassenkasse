@@ -10,7 +10,7 @@
      - AND within activeFromISO/activeToISO for expense date
    ✓ Deposit dropdown filtered by date eligibility
    ✓ Add-Family form wired
-   ✓ NEW: Family overview popup (reportDialog)
+   ✓ Family overview popup (reportDialog)
    --------------------------------------------------------- */
 
 const STORAGE_KEY = "klassenkasse_familien_v1";
@@ -31,7 +31,7 @@ const I18N = {
 
       summaryTitle: "Übersicht",
       totalBalanceLabel: "Gesamtsaldo",
-      familiesCountLabel: "Familien",
+      familiesCountLabel: "Aktive Familien",
       txCountLabel: "Buchungen",
       bankDeposits: "Einzahlungen (Bank)",
       bankExpenses: "Ausgaben (Bank)",
@@ -116,6 +116,10 @@ const I18N = {
 
       reportTitle: "Übersicht",
       printBtn: "Drucken / PDF",
+
+      appHeaderSubpage: "Warum Klassenkassen schnell unübersichtlich werden",
+      appSubpageExplanation: "Bargeld, WhatsApp-Nachrichten und Tabellen werden schnell chaotisch. Man verliert den Überblick, wer schon gezahlt hat und wofür das Geld ausgegeben wurde. ClassFund hält alles übersichtlich an einem Ort.",
+      appSubpageLink: "Lies, wie du eine Klassenkasse ohne Chaos organisierst",
     },
     labels: {
       deposit: "Einzahlung",
@@ -171,7 +175,7 @@ const I18N = {
 
       summaryTitle: "Overview",
       totalBalanceLabel: "Total balance",
-      familiesCountLabel: "Families",
+      familiesCountLabel: "Active Families",
       txCountLabel: "Transactions",
       bankDeposits: "Deposits (bank)",
       bankExpenses: "Expenses (bank)",
@@ -256,6 +260,10 @@ const I18N = {
 
       reportTitle: "Overview",
       printBtn: "Print / PDF",
+
+      appHeaderSubpage: "WHY Klassenkassen schnell unübersichtlich werden",
+      appSubpageExplanation: "MONEY Bargeld, WhatsApp-Nachrichten und Tabellen werden schnell chaotisch. Man verliert den Überblick, wer schon gezahlt hat und wofür das Geld ausgegeben wurde. ClassFund hält alles übersichtlich an einem Ort.",
+      appSubpageLink: "READ Lies, wie du eine Klassenkasse ohne Chaos organisierst",
     },
     labels: {
       deposit: "Contribution",
@@ -975,6 +983,7 @@ function familyTxItems(familyId) {
         dateISO: t.dateISO,
         createdAt: t.createdAt || 0,
         title: d.labels.typeDeposit,
+        note: (t.note || "").trim(),
         amountCentsSigned: t.centsSigned || 0,
       });
       continue;
@@ -1054,12 +1063,14 @@ function reportTextForCopy(familyId) {
   for (const it of familyTxItems(familyId)) {
     // it.title kommt aktuell schon aus state.lang (de/en), passt also
     const sign = it.amountCentsSigned >= 0 ? "+" : "–";
+    const note = it.note ? ` · ${it.note}` : "";
     lines.push(`- ${it.dateISO} · ${it.title} · ${sign}${formatEUR(Math.abs(it.amountCentsSigned))}`);
   }
 
   return lines.join("\n");
 }
 
+// Renders the report for each family - deposits and expenses
 function openFamilyReport(familyId) {
   const f = familyById(familyId);
   if (!f || !els.reportDialog || !els.reportContent) return;
@@ -1078,10 +1089,12 @@ function openFamilyReport(familyId) {
     .map((it) => {
       const amt = it.amountCentsSigned;
       const cls = amt < 0 ? "neg" : amt > 0 ? "pos" : "";
+      const note = it.note ? ` · ${escapeHtml(it.note)}` : "";
+
       return `
         <tr>
           <td>${escapeHtml(it.dateISO)}</td>
-          <td>${escapeHtml(it.title)}</td>
+          <td>${escapeHtml(it.title)}${note}</td>
           <td class="${cls}" style="font-weight:900; text-align:right;">
             ${amt < 0 ? "–" : "+"}${escapeHtml(formatEUR(Math.abs(amt)))}
           </td>
@@ -1340,7 +1353,8 @@ function renderSummary() {
       "var(--text)";
   }
 
-  if (els.familiesCount) els.familiesCount.textContent = String(state.families.length);
+  const activeCount = state.families.filter(f => f.active).length;
+  if (els.familiesCount) els.familiesCount.textContent = String(activeCount);
   if (els.txCount) els.txCount.textContent = String(state.tx.length);
 
   // Tooltip diagnostics

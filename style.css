@@ -191,6 +191,7 @@ textarea{ resize: vertical; }
   background: rgba(0,0,0,.18);
   border-radius:14px;
   padding:10px;
+  margin: 5px 0;
 }
 html[data-theme="paper"] .summary__item{ background: rgba(255,255,255,.65); }
 .summary__label{ font-size:12px; color: var(--muted); }
