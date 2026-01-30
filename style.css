@@ -191,6 +191,7 @@ textarea{ resize: vertical; }
   background: rgba(0,0,0,.18);
   border-radius:14px;
   padding:10px;
+  margin: 5px 0;
 }
 html[data-theme="paper"] .summary__item{ background: rgba(255,255,255,.65); }
 .summary__label{ font-size:12px; color: var(--muted); }
@@ -371,6 +372,48 @@ html[data-theme="paper"] .categoryOverview{ background: rgba(255,255,255,.65); }
 }
 .catTable th{ text-align:left; color: var(--muted); font-weight: 800; }
 
+
+/* Import dialog UX */
+.dropzone{
+  border: 2px dashed var(--stroke);
+  background: var(--card);
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .08s ease, border-color .12s ease, background .12s ease;
+  outline: none;
+}
+
+.dropzone:focus{
+  box-shadow: 0 0 0 4px rgba(255,255,255,.08);
+}
+
+.dropzone--dragover{
+  border-color: var(--text);
+  transform: scale(1.01);
+}
+
+.dropzone__title{
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.dropzone__sub{
+  font-size: 13px;
+}
+
+.importStatus{
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.importStatus--ok{ color: var(--pos); }
+.importStatus--warn{ color: var(--muted); }
+.importStatus--err{ color: var(--neg); }
+
 /* ---------- reminder UI ---------- */
 .reminderTop{
   display:flex;
@@ -536,7 +579,7 @@ details.detailsCard .btn--primary{
 
 /* Fallback */
 .badge--cat-unkategorisiert {
-  background: #265ba4;
+  background: #666509;
   color: #f1f5f9;
   border-color: #e2e8f0;
 }
@@ -546,13 +589,146 @@ html[data-theme="paper"] .badge--category{
   background-opacity: .9;
 }
 
+/* ==============================
+   Footer
+================================ */
+
+.app-footer {
+  margin-top: 40px;
+  padding: 24px 16px 28px;
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--card) 65%, transparent 35%);
+  backdrop-filter: blur(10px);
+}
+
+.footer-container {
+  max-width: 1160px;
+  margin: 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  flex-wrap: wrap;
+}
+
+.footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.footer-logo {
+  height: 36px;
+  width: auto;
+  opacity: 0.85;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.footer-brand:hover .footer-logo {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.footer-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.footer-meta a {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footer-meta a:hover {
+  text-decoration: underline;
+}
+
+.footer-sep {
+  opacity: 0.5;
+}
+
+
+/* --- SEO / FAQ sections --- */
+
+.seo-privacy,
+.seo-faq,
+.seo-teaser{
+  width: 100%;
+  margin: 18px auto 34px;
+  padding: 16px 22px;
+  border: 1px solid var(--stroke);
+  background: color-mix(in srgb, var(--card) 70%, transparent 30%);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+.seo-privacy h2,
+.seo-faq h2,
+.seo-teaser h2{
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.seo-privacy p,
+.seo-faq p,
+.seo-teaser p{
+  margin: 8px 0;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 92ch;
+}
+
+.seo-privacy hr,
+.seo-teaser hr{
+  border: 0;
+  border-top: 1px solid var(--stroke);
+  margin: 14px 0;
+  opacity: .9;
+}
+
+.seo-faq h3,
+.seo-teaser h3{
+  margin: 14px 0 6px;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.seo-faq p,
+.seo-teaser p{
+  margin: 0 0 10px;
+}
+
+
+/*---------------------------*/
 /* Mobile comfort */
+/*---------------------------*/
+
 @media (max-width: 520px){
   .app{ padding: 14px; }
   .topbar{ flex-direction: column; align-items: stretch; }
   .topbar__controls{ justify-content: flex-start; }
-}
 
+  .footer-container {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .footer-meta {
+    justify-content: center;
+  }
+}
 
 @media (min-width: 981px){
   .grid{ align-items: start; }
@@ -563,5 +739,11 @@ html[data-theme="paper"] .badge--category{
     align-self: start;
     max-height: calc(100vh - 32px);
     overflow: auto;
+  }
+
+  .seo-privacy,
+  .seo-faq,
+  .seo-teaser{
+    padding: 14px;
   }
 }

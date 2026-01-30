@@ -10,7 +10,7 @@
      - AND within activeFromISO/activeToISO for expense date
    ✓ Deposit dropdown filtered by date eligibility
    ✓ Add-Family form wired
-   ✓ NEW: Family overview popup (reportDialog)
+   ✓ Family overview popup (reportDialog)
    --------------------------------------------------------- */
 
 const STORAGE_KEY = "klassenkasse_familien_v1";
@@ -26,12 +26,16 @@ const I18N = {
       reminderBtn: "Erinnerungen",
       exportBtn: "Export",
       importBtn: "Import",
+      downloadBankCsvBtn: "CSV (Bank) Download",
       resetBtn: "Reset",
 
       summaryTitle: "Übersicht",
       totalBalanceLabel: "Gesamtsaldo",
-      familiesCountLabel: "Familien",
+      familiesCountLabel: "Aktive Familien",
       txCountLabel: "Buchungen",
+      bankDeposits: "Einzahlungen (Bank)",
+      bankExpenses: "Ausgaben (Bank)",
+      bankBalance: "Kontostand Bank",
 
       settingsTitle: "Einstellungen",
       targetAmountLabel: "Zielbetrag pro Familie (€)",
@@ -112,6 +116,10 @@ const I18N = {
 
       reportTitle: "Übersicht",
       printBtn: "Drucken / PDF",
+
+      appHeaderSubpage: "Warum Klassenkassen schnell unübersichtlich werden",
+      appSubpageExplanation: "Bargeld, WhatsApp-Nachrichten und Tabellen werden schnell chaotisch. Man verliert den Überblick, wer schon gezahlt hat und wofür das Geld ausgegeben wurde. ClassFund hält alles übersichtlich an einem Ort.",
+      appSubpageLink: "Lies, wie du eine Klassenkasse ohne Chaos organisierst",
     },
     labels: {
       deposit: "Einzahlung",
@@ -160,13 +168,18 @@ const I18N = {
       themeLabel: "Theme",
       reminderBtn: "Reminders",
       exportBtn: "Export",
+      downloadBankCsvBtn: "CSV (Bank) Download",
+      downloadAllCsvBtn: "CSV (All) Download",
       importBtn: "Import",
       resetBtn: "Reset",
 
       summaryTitle: "Overview",
       totalBalanceLabel: "Total balance",
-      familiesCountLabel: "Families",
+      familiesCountLabel: "Active Families",
       txCountLabel: "Transactions",
+      bankDeposits: "Deposits (bank)",
+      bankExpenses: "Expenses (bank)",
+      bankBalance: "Bank balance",
 
       settingsTitle: "Settings",
       targetAmountLabel: "Target amount per family (€)",
@@ -247,6 +260,10 @@ const I18N = {
 
       reportTitle: "Overview",
       printBtn: "Print / PDF",
+
+      appHeaderSubpage: "Class funds can quickly become confusing",
+      appSubpageExplanation: "Cash payments, WhatsApp messages, and spreadsheets get messy fast. It’s easy to lose track of who has already paid and what the money was spent on. ClassFund keeps everything clearly organized in one place.",
+      appSubpageLink: "Read how to organize a class fund without the chaos.",
     },
     labels: {
       deposit: "Contribution",
@@ -289,14 +306,60 @@ const I18N = {
   },
 };
 
+const SUPPORTED_LANGS = ["de", "en"];
 function normalizeLang(lang) {
-  return lang === "de" ? "de" : "en";
+  return SUPPORTED_LANGS.includes(lang) ? lang : "en";
 }
 function dict() {
   return I18N[normalizeLang(state?.lang || "en")] || I18N.en;
 }
 
+/** ---------- language switcher helpers ---------- **/
+function setLang(lang) {
+  state.lang = normalizeLang(lang);
+  document.documentElement.lang = state.lang;
+  saveState();
+  renderAll();
+}
+
+function updateSeoLinkForLang(lang) {
+  const seoLink = document.getElementById("seoLink");
+  if (!seoLink) return;
+
+  const map = {
+    en: "/pages/en/class-fund-explainer.html",
+    de: "/pages/de/klassenkasse-erklaerung.html",
+  };
+
+  seoLink.setAttribute("href", map[lang] || map.en);
+}
+
 /** ---------- utils ---------- **/
+function downloadTextFile(filename, content, mime = "application/octet-stream") {
+  const blob = new Blob([content], { type: mime });
+
+  if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+    window.navigator.msSaveOrOpenBlob(blob, filename);
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;   // wichtig
+  a.rel = "noopener";
+  a.style.display = "none";
+  document.body.appendChild(a);
+
+  a.click();
+
+  // Safari/WebKit: später revoke, sonst "Unbenannt"
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 1500);
+}
+
 function uid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
@@ -452,19 +515,47 @@ const els = {
   theme: document.getElementById("theme"),
   reminderBtn: document.getElementById("reminderBtn"),
   exportBtn: document.getElementById("exportBtn"),
-  importInput: document.getElementById("importInput"),
   resetBtn: document.getElementById("resetBtn"),
   exportDialog: document.getElementById("exportDialog"),
   exportText: document.getElementById("exportText"),
   copyExport: document.getElementById("copyExport"),
   downloadExport: document.getElementById("downloadExport"),
   closeExport: document.getElementById("closeExport"),
+  downloadBankCsvBtn: document.getElementById("downloadBankCsvBtn"),
 
   totalBalance: document.getElementById("totalBalance"),
   familiesCount: document.getElementById("familiesCount"),
   txCount: document.getElementById("txCount"),
 
   targetAmount: document.getElementById("targetAmount"),
+
+  // reminder dialog
+  reminderDialog: document.getElementById("reminderDialog"),
+  closeReminder: document.getElementById("closeReminder"),
+  reminderMode: document.getElementById("reminderMode"),
+  reminderActiveOnly: document.getElementById("reminderActiveOnly"),
+  reminderSubject: document.getElementById("reminderSubject"),
+  reminderTemplate: document.getElementById("reminderTemplate"),
+  copyAllReminders: document.getElementById("copyAllReminders"),
+  openNextReminder: document.getElementById("openNextReminder"),
+  reminderList: document.getElementById("reminderList"),
+  reminderCount: document.getElementById("reminderCount"),
+
+  // import dialog UX
+  importDialog: document.getElementById("importDialog"),
+  closeImport: document.getElementById("closeImport"),
+  importDropzone: document.getElementById("importDropzone"),
+  importDialogFile: document.getElementById("importDialogFile"),
+  confirmImportBtn: document.getElementById("confirmImportBtn"),
+  importStatus: document.getElementById("importStatus"),
+  importBackupExport: document.getElementById("importBackupExport"),
+  importBtn: document.getElementById("importBtn"),
+
+  // Reset confirm modal (UI)
+  confirmDialog: document.getElementById("confirmDialog"),
+  closeConfirm: document.getElementById("closeConfirm"),
+  cancelReset: document.getElementById("cancelReset"),
+  confirmReset: document.getElementById("confirmReset"),
 
   depositDate: document.getElementById("depositDate"),
   depositFamily: document.getElementById("depositFamily"),
@@ -675,23 +766,235 @@ function rebuildExpenseAllocations(expenseId, newTitle, newTotalCents, newDateIS
   return true;
 }
 
+/** =========================================================
 /** ---------- balances ---------- **/
+/** =========================================================*/
+
 function calcBalances() {
+  // Per-family balances only for families that still exist in state.families
   const byFamily = new Map(state.families.map((f) => [f.id, 0]));
+
+  // Total should reflect *all* tx rows, even if a family was deleted/missing
   let total = 0;
 
+  // Optional diagnostics: tx entries referencing missing families
+  let orphanTxCount = 0;
+  let orphanCentsTotal = 0;
+
   for (const t of state.tx) {
-    if (!t.familyId) continue;
-    if (!byFamily.has(t.familyId)) continue;
-    byFamily.set(t.familyId, byFamily.get(t.familyId) + (t.centsSigned || 0));
-    total += t.centsSigned || 0;
+    const v = t?.centsSigned || 0;
+
+    // TOTAL: always include every tx
+    total += v;
+
+    const fid = t?.familyId;
+    if (!fid || !byFamily.has(fid)) {
+      orphanTxCount += 1;
+      orphanCentsTotal += v;
+      continue;
+    }
+
+    byFamily.set(fid, byFamily.get(fid) + v);
   }
-  return { byFamily, total };
+
+  return { byFamily, total, orphanTxCount, orphanCentsTotal };
 }
 
+function calcBankTotals() {
+  let deposits = 0;
+  let expenses = 0;
+
+  for (const t of state.tx) {
+    if (t.type === "deposit") {
+      deposits += t.centsSigned || 0;
+    }
+  }
+
+  for (const e of state.expenses) {
+    expenses += e.totalCents || 0;
+  }
+
+  const balance = deposits - expenses;
+  return { deposits, expenses, balance };
+}
+
+function calcFamilyBalances() {
+  const byFamily = new Map(state.families.map((f) => [f.id, 0]));
+
+  for (const t of state.tx) {
+    if (!byFamily.has(t.familyId)) continue;
+    byFamily.set(t.familyId, byFamily.get(t.familyId) + (t.centsSigned || 0));
+  }
+
+  return byFamily;
+}
+
+function detectDuplicateBankEntries() {
+  const seen = new Set();
+  const duplicates = [];
+
+  // Deposits
+  for (const t of state.tx.filter(t => t.type === "deposit")) {
+    const key = `D|${t.dateISO}|${t.centsSigned}|${t.note || ""}|${t.familyId}`;
+    if (seen.has(key)) duplicates.push(key);
+    seen.add(key);
+  }
+
+  // Expenses
+  for (const e of state.expenses) {
+    const key = `E|${e.dateISO}|${e.totalCents}|${e.title || ""}`;
+    if (seen.has(key)) duplicates.push(key);
+    seen.add(key);
+  }
+
+  return duplicates;
+}
+
+function isDuplicateDeposit(dateISO, cents, note) {
+  return state.tx.some(t =>
+    t.type === "deposit" &&
+    t.dateISO === dateISO &&
+    t.centsSigned === cents &&
+    (t.note || "") === (note || "")
+  );
+}
+
+// Duplicates check
+let duplicateWarningShown = false;
+function warnIfDuplicatesOnce() {
+  if (duplicateWarningShown) return;
+  const dups = detectDuplicateBankEntries();
+  if (dups.length === 0) return;
+
+  duplicateWarningShown = true;
+  alert(
+    state.lang === "de"
+      ? `⚠️ Achtung: ${dups.length} mögliche doppelte Bankbuchungen erkannt.`
+      : `⚠️ Warning: ${dups.length} possible duplicate bank entries detected.`
+  );
+}
+
+function bankReconciliationStatus() {
+  const bank = calcBankTotals();
+  const status = bank.balance === 0 ? "ok" : "warn";
+  return { status, diff: bank.balance };
+}
+
+function buildBankCsvRows() {
+  // Bank-relevant: deposits (tx deposit) + expenses (expenses list)
+  const rows = [];
+
+  // Deposits
+  for (const t of state.tx) {
+    if (t.type !== "deposit") continue;
+    const f = familyById(t.familyId);
+    rows.push({
+      kind: "DEPOSIT",
+      dateISO: t.dateISO,
+      amountEUR: eurNumber(t.centsSigned),
+      note: t.note || "",
+      category: t.category || "",
+      family: familyDisplayName(f || {}),
+      familyId: t.familyId || "",
+      id: t.id || "",
+      createdAt: t.createdAt || "",
+    });
+  }
+
+  // Expenses (as they appear on bank)
+  for (const e of state.expenses) {
+    rows.push({
+      kind: "EXPENSE",
+      dateISO: e.dateISO,
+      amountEUR: eurNumber(-Math.abs(e.totalCents || 0)), // negative
+      note: e.title || "",
+      category: e.category || "",
+      family: "",     // n/a on bank level
+      familyId: "",   // n/a
+      id: e.id || "",
+      createdAt: e.createdAt || "",
+    });
+  }
+
+  // Sort by date desc, then createdAt desc
+  rows.sort((a, b) => (b.dateISO.localeCompare(a.dateISO) || (Number(b.createdAt) - Number(a.createdAt))));
+
+  return rows;
+}
+
+function downloadBankCsv() {
+  const rows = buildBankCsvRows();
+
+  const headers = [
+    "kind",        // DEPOSIT / EXPENSE
+    "dateISO",
+    "amountEUR",   // deposits positive, expenses negative
+    "note",        // deposit note OR expense title
+    "category",
+    "family",
+    "familyId",
+    "id",
+    "createdAt",
+  ];
+
+  const data = rows.map(r => headers.map(h => r[h] ?? ""));
+  const csv = toCsv(data, headers, ";");
+
+  const filename = `classfund-bank-${todayISO()}.csv`;
+  downloadTextFile(filename, csv);
+}
+
+
 /** =========================================================
-    NEW: FAMILY OVERVIEW POPUP (reportDialog)
-    ========================================================= */
+DEBUG: find orphan / suspicious transactions
+ ========================================================= */
+function debugFindSuspiciousTransactions() {
+  const familiesById = new Set(state.families.map(f => f.id));
+
+  const rows = state.tx.map(t => {
+    const familyExists = t.familyId && familiesById.has(t.familyId);
+
+    return {
+      id: t.id,
+      type: t.type,
+      date: t.dateISO,
+      centsSigned: t.centsSigned,
+      amountEUR: formatEUR(t.centsSigned),
+      familyId: t.familyId || "—",
+      familyExists,
+      note: t.note || "",
+      expenseId: t.expenseId || null,
+    };
+  });
+
+  const orphanTx = rows.filter(r => !r.familyExists);
+  const orphanSum = orphanTx.reduce((s, r) => s + r.centsSigned, 0);
+
+  console.group("🧪 ClassFund Debug — suspicious transactions");
+
+  console.log("All transactions:", rows.length);
+  console.log("Orphan transactions (missing family):", orphanTx.length);
+  console.log("Orphan total:", formatEUR(orphanSum));
+
+  if (orphanTx.length > 0) {
+    console.table(orphanTx);
+  } else {
+    console.log("✅ No orphan transactions found.");
+  }
+
+  console.groupEnd();
+
+  return {
+    orphanTx,
+    orphanSum,
+    totalTxCount: rows.length,
+  };
+}
+
+
+/** =========================================================
+  FAMILY OVERVIEW POPUP (reportDialog)
+========================================================= */
 let currentReportFamilyId = null;
 
 function familyTxItems(familyId) {
@@ -707,6 +1010,7 @@ function familyTxItems(familyId) {
         dateISO: t.dateISO,
         createdAt: t.createdAt || 0,
         title: d.labels.typeDeposit,
+        note: (t.note || "").trim(),
         amountCentsSigned: t.centsSigned || 0,
       });
       continue;
@@ -786,12 +1090,14 @@ function reportTextForCopy(familyId) {
   for (const it of familyTxItems(familyId)) {
     // it.title kommt aktuell schon aus state.lang (de/en), passt also
     const sign = it.amountCentsSigned >= 0 ? "+" : "–";
+    const note = it.note ? ` · ${it.note}` : "";
     lines.push(`- ${it.dateISO} · ${it.title} · ${sign}${formatEUR(Math.abs(it.amountCentsSigned))}`);
   }
 
   return lines.join("\n");
 }
 
+// Renders the report for each family - deposits and expenses
 function openFamilyReport(familyId) {
   const f = familyById(familyId);
   if (!f || !els.reportDialog || !els.reportContent) return;
@@ -810,10 +1116,12 @@ function openFamilyReport(familyId) {
     .map((it) => {
       const amt = it.amountCentsSigned;
       const cls = amt < 0 ? "neg" : amt > 0 ? "pos" : "";
+      const note = it.note ? ` · ${escapeHtml(it.note)}` : "";
+
       return `
         <tr>
           <td>${escapeHtml(it.dateISO)}</td>
-          <td>${escapeHtml(it.title)}</td>
+          <td>${escapeHtml(it.title)}${note}</td>
           <td class="${cls}" style="font-weight:900; text-align:right;">
             ${amt < 0 ? "–" : "+"}${escapeHtml(formatEUR(Math.abs(amt)))}
           </td>
@@ -863,6 +1171,334 @@ function openFamilyReport(familyId) {
 function closeFamilyReport() {
   if (els.reportDialog?.open) els.reportDialog.close();
   currentReportFamilyId = null;
+}
+
+/** =========================================================
+  IMPORT DIALOG UX
+========================================================= */
+let pendingImportFile = null;
+
+function setImportStatus(msg, kind = "warn") {
+  if (!els.importStatus) return;
+  els.importStatus.textContent = msg || "";
+  els.importStatus.className = "importStatus " + (kind ? `importStatus--${kind}` : "");
+}
+
+function openImportDialog() {
+  if (!els.importDialog) return;
+
+  pendingImportFile = null;
+  if (els.confirmImportBtn) els.confirmImportBtn.disabled = true;
+
+  // language-friendly hints (simple, no full i18n yet)
+  if (document.getElementById("importHelpText")) {
+    document.getElementById("importHelpText").textContent =
+      state.lang === "de"
+        ? "Importiere einen früheren Export (.json). Die aktuellen Daten in diesem Browser werden ersetzt."
+        : "Import a previous export (.json). Your current data will be replaced in this browser.";
+  }
+
+  if (els.importDropzone) {
+    els.importDropzone.querySelector(".dropzone__title").textContent =
+      state.lang === "de" ? "JSON hier ablegen" : "Drop JSON here";
+    els.importDropzone.querySelector(".dropzone__sub").textContent =
+      state.lang === "de" ? "…oder Datei auswählen" : "…or choose a file";
+  }
+
+  setImportStatus(
+    state.lang === "de"
+      ? "Tipp: Exportiere vorher ein Backup, falls du zurück willst."
+      : "Tip: Export a backup first, if you want to be able to revert.",
+    "warn"
+  );
+
+  els.importDialog.showModal();
+}
+
+function closeImportDialog() {
+  if (els.importDialog?.open) els.importDialog.close();
+  pendingImportFile = null;
+}
+
+function setPendingImportFile(file) {
+  pendingImportFile = null;
+
+  if (!file) {
+    if (els.confirmImportBtn) els.confirmImportBtn.disabled = true;
+    setImportStatus(state.lang === "de" ? "Keine Datei ausgewählt." : "No file selected.", "warn");
+    return;
+  }
+
+  const isJson =
+    file.type === "application/json" ||
+    file.name.toLowerCase().endsWith(".json");
+
+  if (!isJson) {
+    if (els.confirmImportBtn) els.confirmImportBtn.disabled = true;
+    setImportStatus(
+      state.lang === "de" ? "Bitte eine .json Export-Datei auswählen." : "Please select a .json export file.",
+      "err"
+    );
+    return;
+  }
+
+  pendingImportFile = file;
+  if (els.confirmImportBtn) els.confirmImportBtn.disabled = false;
+
+  setImportStatus(
+    state.lang === "de"
+      ? `Ausgewählt: ${file.name} (${Math.round(file.size / 1024)} KB)`
+      : `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`,
+    "warn"
+  );
+}
+
+function doImportFromPendingFile() {
+  const d = dict();
+  if (!pendingImportFile) return;
+
+  setImportStatus(state.lang === "de" ? "Import läuft…" : "Importing…", "warn");
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || ""));
+      if (!parsed || typeof parsed !== "object") throw new Error("bad");
+
+      // accept older shapes
+      const candidate = { ...parsed };
+      delete candidate.exportedAt;
+
+      if (!candidate.tx && Array.isArray(candidate.transactions)) candidate.tx = candidate.transactions;
+      if (!Array.isArray(candidate.families)) candidate.families = [];
+      if (!Array.isArray(candidate.tx)) candidate.tx = [];
+      if (!Array.isArray(candidate.expenses)) candidate.expenses = [];
+      if (!Array.isArray(candidate.categories)) candidate.categories = defaultState().categories;
+
+      if (!candidate.lang) candidate.lang = state.lang || "en";
+      if (!candidate.theme) candidate.theme = state.theme || "minimal";
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(candidate));
+
+      state = loadState();
+      lastExpenseDateISO = null;
+      expenseSelection.clear();
+      renderAll();
+
+      setImportStatus(state.lang === "de" ? "✅ Import erfolgreich." : "✅ Import successful.", "ok");
+
+      // auto-close after short delay (UX-friendly)
+      setTimeout(() => closeImportDialog(), 500);
+
+    } catch (e) {
+      console.error("Import failed:", e);
+      setImportStatus(d.errors.importFailed || "Import failed.", "err");
+    } finally {
+      if (els.importDialogFile) els.importDialogFile.value = "";
+      pendingImportFile = null;
+      if (els.confirmImportBtn) els.confirmImportBtn.disabled = true;
+    }
+  };
+  reader.readAsText(pendingImportFile);
+}
+
+/** =========================================================
+  REMINDER DIALOG (batch)
+========================================================= */
+let reminderRecipients = [];
+let reminderCursor = 0;
+
+function defaultReminderSubject() {
+  return state.lang === "de" ? "Erinnerung: Klassenkasse" : "Reminder: Class fund";
+}
+
+function defaultReminderTemplate() {
+  if (state.lang === "de") {
+    return [
+      "Hallo {{parents}},",
+      "",
+      "kurze Erinnerung zur Klassenkasse:",
+      "Aktueller Stand: {{balance}}",
+      state.targetCents > 0 ? "Ziel: {{target}} · Fehlt noch: {{due}}" : "",
+      "",
+      "Danke & liebe Grüße",
+    ].filter(Boolean).join("\n");
+  }
+  return [
+    "Hi {{parents}},",
+    "",
+    "quick reminder about the class fund:",
+    "Current balance: {{balance}}",
+    state.targetCents > 0 ? "Target: {{target}} · Due: {{due}}" : "",
+    "",
+    "Thank you!",
+  ].filter(Boolean).join("\n");
+}
+
+function applyTemplate(template, family, balanceCents) {
+  const parents = parentsText(family);
+  const kids = childrenText(family);
+  const due = dueCents(balanceCents);
+  const target = state.targetCents || 0;
+
+  return String(template || "")
+    .replaceAll("{{parents}}", parents || "—")
+    .replaceAll("{{children}}", kids || "")
+    .replaceAll("{{balance}}", formatEUR(balanceCents))
+    .replaceAll("{{due}}", formatEUR(due))
+    .replaceAll("{{target}}", formatEUR(target))
+    .replaceAll("{{email}}", String(family?.email || ""))
+    .replaceAll("{{today}}", todayISO());
+}
+
+function buildReminderRecipients() {
+  const mode = els.reminderMode?.value || "below_target";
+  const activeOnly = !!els.reminderActiveOnly?.checked;
+
+  const balances = calcFamilyBalances();
+  const fams = state.families.slice();
+
+  const list = [];
+
+  for (const f of fams) {
+    if (activeOnly && !f.active) continue;
+
+    const bal = balances.get(f.id) || 0;
+    const due = dueCents(bal);
+
+    // only families with email make sense for mailto
+    const email = String(f.email || "").trim();
+    if (!email || !isValidEmail(email)) continue;
+
+    if (mode === "negative_only") {
+      if (bal < 0) list.push({ f, bal });
+      continue;
+    }
+
+    // below_target (default)
+    if (state.targetCents > 0) {
+      if (due > 0) list.push({ f, bal });
+    } else {
+      // if no target set, fallback: remind only negative
+      if (bal < 0) list.push({ f, bal });
+    }
+  }
+
+  // sort: biggest due/most negative first
+  list.sort((a, b) => {
+    const aScore = state.targetCents > 0 ? dueCents(a.bal) : Math.abs(Math.min(0, a.bal));
+    const bScore = state.targetCents > 0 ? dueCents(b.bal) : Math.abs(Math.min(0, b.bal));
+    return (bScore - aScore) || familyDisplayName(a.f).localeCompare(familyDisplayName(b.f));
+  });
+
+  return list;
+}
+
+function renderReminderList() {
+  if (!els.reminderList) return;
+
+  const template = els.reminderTemplate?.value || defaultReminderTemplate();
+  const subject = els.reminderSubject?.value || defaultReminderSubject();
+
+  els.reminderList.innerHTML = "";
+
+  reminderRecipients.forEach((it, idx) => {
+    const row = document.createElement("div");
+    row.className = "reminderRow";
+
+    const left = document.createElement("div");
+    left.className = "reminderRow__left";
+
+    const title = document.createElement("div");
+    title.style.fontWeight = "800";
+    title.textContent = `${familyDisplayName(it.f)} · ${it.f.email}`;
+
+    const meta = document.createElement("div");
+    meta.className = "muted small";
+    const due = dueCents(it.bal);
+    meta.textContent =
+      state.targetCents > 0
+        ? `${state.lang === "de" ? "Saldo" : "Balance"}: ${formatEUR(it.bal)} · ${state.lang === "de" ? "Fehlt" : "Due"}: ${formatEUR(due)}`
+        : `${state.lang === "de" ? "Saldo" : "Balance"}: ${formatEUR(it.bal)}`;
+
+    left.appendChild(title);
+    left.appendChild(meta);
+
+    const btn = document.createElement("button");
+    btn.className = "btn btn--primary";
+    btn.type = "button";
+    btn.textContent = state.lang === "de" ? "Öffnen" : "Open";
+    btn.addEventListener("click", () => {
+      reminderCursor = idx;
+      openCurrentReminder(subject, template);
+      renderReminderList(); // refresh highlight
+    });
+
+    if (idx === reminderCursor) {
+      row.style.outline = "2px solid var(--stroke)";
+      row.style.borderRadius = "12px";
+      row.style.padding = "10px";
+    } else {
+      row.style.padding = "10px";
+    }
+
+    row.style.display = "flex";
+    row.style.justifyContent = "space-between";
+    row.style.gap = "12px";
+    row.appendChild(left);
+    row.appendChild(btn);
+
+    els.reminderList.appendChild(row);
+  });
+
+  if (els.reminderCount) {
+    els.reminderCount.textContent =
+      state.lang === "de"
+        ? `${reminderRecipients.length} Empfänger:innen`
+        : `${reminderRecipients.length} recipients`;
+  }
+}
+
+function openCurrentReminder(subject, template) {
+  const it = reminderRecipients[reminderCursor];
+  if (!it) return;
+
+  const body = applyTemplate(template, it.f, it.bal);
+
+  const mailto =
+    `mailto:${encodeURIComponent(it.f.email)}` +
+    `?subject=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+
+  window.location.href = mailto;
+}
+
+function openReminderDialog() {
+  if (!els.reminderDialog) return;
+
+  // Defaults if empty
+  if (els.reminderSubject && !String(els.reminderSubject.value || "").trim()) {
+    els.reminderSubject.value = defaultReminderSubject();
+  }
+  if (els.reminderTemplate && !String(els.reminderTemplate.value || "").trim()) {
+    els.reminderTemplate.value = defaultReminderTemplate();
+  }
+
+  reminderRecipients = buildReminderRecipients();
+  reminderCursor = 0;
+
+  renderReminderList();
+  els.reminderDialog.showModal();
+}
+
+function refreshReminderDialog() {
+  reminderRecipients = buildReminderRecipients();
+  reminderCursor = Math.min(reminderCursor, Math.max(0, reminderRecipients.length - 1));
+  renderReminderList();
+}
+
+function closeReminderDialog() {
+  if (els.reminderDialog?.open) els.reminderDialog.close();
 }
 
 /** =========================================================
@@ -1060,16 +1696,55 @@ function renderDepositFamilyPicker() {
 
 /** ---------- Summary render ---------- **/
 function renderSummary() {
-  const { total } = calcBalances();
-  const activeCount = (state.families || []).filter((f) => f && f.active).length;
+  const bank = calcBankTotals();                 // deposits - expenses
+  const { total, orphanTxCount, orphanCentsTotal } = calcBalances(); // sum(tx)
 
-  if (els.totalBalance) els.totalBalance.textContent = formatEUR(total);
+  // show BANK truth as main number
+  if (els.totalBalance) {
+    els.totalBalance.textContent = formatEUR(bank.balance);
+    els.totalBalance.style.color =
+      bank.balance < 0 ? "var(--neg)" :
+      bank.balance > 0 ? "var(--pos)" :
+      "var(--text)";
+  }
+
+  const activeCount = state.families.filter(f => f.active).length;
   if (els.familiesCount) els.familiesCount.textContent = String(activeCount);
   if (els.txCount) els.txCount.textContent = String(state.tx.length);
 
+  // Tooltip diagnostics
   if (els.totalBalance) {
-    els.totalBalance.style.color = total < 0 ? "var(--neg)" : total > 0 ? "var(--pos)" : "var(--text)";
+    const hints = [];
+
+    // orphan warning (transactions referencing missing families)
+    if (orphanTxCount > 0) {
+      hints.push(
+        state.lang === "de"
+          ? `Hinweis: ${orphanTxCount} Buchung(en) referenzieren keine vorhandene Familie (Summe: ${formatEUR(orphanCentsTotal)}).`
+          : `Note: ${orphanTxCount} transaction(s) reference a missing family (sum: ${formatEUR(orphanCentsTotal)}).`
+      );
+    }
+
+    // consistency check: bank.balance should equal total tx sum
+    const diff = bank.balance - total;
+    if (diff !== 0) {
+      hints.push(
+        state.lang === "de"
+          ? `⚠️ Abweichung: Bank-Saldo (${formatEUR(bank.balance)}) ≠ TX-Summe (${formatEUR(total)}). Diff: ${formatEUR(diff)}.`
+          : `⚠️ Mismatch: Bank balance (${formatEUR(bank.balance)}) ≠ TX sum (${formatEUR(total)}). Diff: ${formatEUR(diff)}.`
+      );
+    }
+
+    els.totalBalance.title = hints.join("\n");
   }
+}
+
+function renderBankSummary() {
+  const bank = calcBankTotals();
+
+  document.getElementById("bankDeposits").textContent = formatEUR(bank.deposits);
+  document.getElementById("bankExpenses").textContent = formatEUR(bank.expenses);
+  document.getElementById("bankBalance").textContent = formatEUR(bank.balance);
 }
 
 /** ---------- Families list (minimal) ---------- **/
@@ -1483,6 +2158,15 @@ function addDeposit() {
   const note = String(els.depositNote?.value || "").trim().slice(0, 120);
   const category = ensureCategoryExists(els.depositCategory?.value);
 
+  if (isDuplicateDeposit(dateISO, cents, note)) {
+    const ok = confirm(
+      state.lang === "de"
+        ? "Diese Einzahlung sieht identisch zu einer bestehenden aus. Trotzdem speichern?"
+        : "This deposit looks identical to an existing one. Save anyway?"
+    );
+    if (!ok) return;
+  }
+
   state.tx.push({
     id: uid(),
     type: "deposit",
@@ -1690,40 +2374,7 @@ function deleteExpense(expenseId) {
 }
 
 /** ---------- Export / Import / Reset ---------- **/
-function importJsonFile(file) {
-  const d = dict();
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const parsed = JSON.parse(String(reader.result || ""));
-      if (!parsed || typeof parsed !== "object") throw new Error("bad");
-      if (!Array.isArray(parsed.families) || !Array.isArray(parsed.tx) || !Array.isArray(parsed.expenses)) {
-        throw new Error("bad format");
-      }
-
-      const cleaned = { ...parsed };
-      delete cleaned.exportedAt;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-
-      state = loadState();
-      lastExpenseDateISO = null;
-      expenseSelection.clear();
-      renderAll();
-
-    } catch {
-      alert(d.errors.importFailed);
-    } finally {
-      if (els.importInput) els.importInput.value = "";
-    }
-  };
-  reader.readAsText(file);
-}
-
-function resetAll() {
-  const d = dict();
-  const ok = confirm(d.errors.confirmReset);
-  if (!ok) return;
-
+function resetAllNow() {
   localStorage.removeItem(STORAGE_KEY);
   state = defaultState();
   saveState();
@@ -1734,12 +2385,32 @@ function resetAll() {
   renderAll();
 }
 
+function openResetConfirmDialog() {
+  if (!els.confirmDialog) return;
+
+  // optional: i18n text im Dialog aktualisieren (falls du data-i18n nutzt, ist das eh drin)
+  // aber falls du "hardcoded" Text drin hast, bleibt es so ok.
+
+  els.confirmDialog.showModal();
+}
+
+function closeResetConfirmDialog() {
+  if (els.confirmDialog?.open) els.confirmDialog.close();
+}
+
 /** ---------- Render all ---------- **/
 function applyTheme() {
   document.documentElement.setAttribute("data-theme", state.theme);
 }
 function applyLang() {
   document.documentElement.lang = state.lang;
+}
+
+function applyLangVisibility() {
+  const lang = normalizeLang(state.lang);
+  document.querySelectorAll("[data-lang]").forEach((el) => {
+    el.hidden = el.getAttribute("data-lang") !== lang;
+  });
 }
 
 function t(key) {
@@ -1762,6 +2433,8 @@ function applyI18n() {
 function renderAll() {
   applyLang();
   applyI18n();
+  updateSeoLinkForLang(state.lang); // language-aware explainer link (if #seoLink exists)
+  applyLangVisibility(); // controls SEO+FAQ blocks
   applyTheme();
 
   if (els.lang) els.lang.value = state.lang;
@@ -1776,17 +2449,18 @@ function renderAll() {
   renderExpenseChecklist();
 
   renderSummary();
+  renderBankSummary();
   renderFamilies();
   renderLedger();
   renderCategoryOverview();
+
+  warnIfDuplicatesOnce();
 }
 
 /** ---------- Bindings ---------- **/
 if (els.lang) {
   els.lang.addEventListener("change", () => {
-    state.lang = normalizeLang(els.lang.value);
-    saveState();
-    renderAll();
+    setLang(els.lang.value);
   });
 }
 if (els.theme) {
@@ -1845,6 +2519,10 @@ if (els.children) {
   els.children.addEventListener("keydown", (e) => {
     if (e.key === "Enter") addFamilyFromForm();
   });
+}
+
+if (els.downloadBankCsvBtn) {
+  els.downloadBankCsvBtn.addEventListener("click", downloadBankCsv);
 }
 
 /** mode toggles */
@@ -1916,29 +2594,166 @@ if (els.printReport) {
     w.document.close();
   });
 }
+if (els.importBtn) els.importBtn.addEventListener("click", openImportDialog);
+// Import dialog bindings
+if (els.closeImport) els.closeImport.addEventListener("click", closeImportDialog);
 
-if (els.importInput) {
-  els.importInput.addEventListener("change", (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (file) importJsonFile(file);
+if (els.importDialog) {
+  els.importDialog.addEventListener("click", (e) => {
+    if (e.target === els.importDialog) closeImportDialog();
   });
 }
-if (els.resetBtn) els.resetBtn.addEventListener("click", resetAll);
+
+// Reminder dialog open/close
+if (els.reminderBtn) els.reminderBtn.addEventListener("click", openReminderDialog);
+if (els.closeReminder) els.closeReminder.addEventListener("click", closeReminderDialog);
+
+if (els.reminderDialog) {
+  els.reminderDialog.addEventListener("click", (e) => {
+    if (e.target === els.reminderDialog) closeReminderDialog();
+  });
+}
+
+// Refresh list when criteria changes
+if (els.reminderMode) els.reminderMode.addEventListener("change", refreshReminderDialog);
+if (els.reminderActiveOnly) els.reminderActiveOnly.addEventListener("change", refreshReminderDialog);
+
+// Keep list up-to-date when user edits subject/template
+if (els.reminderSubject) els.reminderSubject.addEventListener("input", renderReminderList);
+if (els.reminderTemplate) els.reminderTemplate.addEventListener("input", renderReminderList);
+
+// Open next email
+if (els.openNextReminder) {
+  els.openNextReminder.addEventListener("click", () => {
+    if (!reminderRecipients.length) return;
+    const subject = els.reminderSubject?.value || defaultReminderSubject();
+    const template = els.reminderTemplate?.value || defaultReminderTemplate();
+
+    openCurrentReminder(subject, template);
+
+    // advance cursor (wrap)
+    reminderCursor = (reminderCursor + 1) % reminderRecipients.length;
+    renderReminderList();
+  });
+}
+
+// Copy all reminders as text blocks
+if (els.copyAllReminders) {
+  els.copyAllReminders.addEventListener("click", async () => {
+    if (!reminderRecipients.length) return;
+
+    const subject = els.reminderSubject?.value || defaultReminderSubject();
+    const template = els.reminderTemplate?.value || defaultReminderTemplate();
+
+    const blocks = reminderRecipients.map((it) => {
+      const body = applyTemplate(template, it.f, it.bal);
+      return [
+        `---`,
+        `TO: ${it.f.email}`,
+        `SUBJECT: ${subject}`,
+        ``,
+        body,
+        ``,
+      ].join("\n");
+    }).join("\n");
+
+    try {
+      await navigator.clipboard.writeText(blocks);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = blocks;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+  });
+}
+
+if (els.importBackupExport) {
+  els.importBackupExport.addEventListener("click", () => {
+    // reuse export dialog flow
+    openExportDialog();
+    setImportStatus(
+      state.lang === "de"
+        ? "Backup-Export geöffnet. Danach kannst du hier importieren."
+        : "Backup export opened. You can import here afterwards.",
+      "warn"
+    );
+  });
+}
+
+if (els.importDialogFile) {
+  els.importDialogFile.addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    setPendingImportFile(file);
+  });
+}
+
+if (els.confirmImportBtn) {
+  els.confirmImportBtn.addEventListener("click", doImportFromPendingFile);
+}
+
+if (els.importDropzone) {
+  // click -> open file chooser
+  els.importDropzone.addEventListener("click", () => els.importDialogFile?.click());
+
+  // keyboard accessibility
+  els.importDropzone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") els.importDialogFile?.click();
+  });
+
+  // drag/drop
+  ["dragenter", "dragover"].forEach((ev) => {
+    els.importDropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      els.importDropzone.classList.add("dropzone--dragover");
+    });
+  });
+
+  ["dragleave", "drop"].forEach((ev) => {
+    els.importDropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      els.importDropzone.classList.remove("dropzone--dragover");
+    });
+  });
+
+  els.importDropzone.addEventListener("drop", (e) => {
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file) return;
+    setPendingImportFile(file);
+  });
+}
+
+if (els.resetBtn) els.resetBtn.addEventListener("click", openResetConfirmDialog);
 if (els.exportBtn) {
   els.exportBtn.addEventListener("click", openExportDialog);
 }
 
+// Reset confirm dialog wiring (UI modal)
+if (els.closeConfirm) els.closeConfirm.addEventListener("click", closeResetConfirmDialog);
+if (els.cancelReset) els.cancelReset.addEventListener("click", closeResetConfirmDialog);
+
+if (els.confirmReset) {
+  els.confirmReset.addEventListener("click", () => {
+    resetAllNow();
+    closeResetConfirmDialog();
+  });
+}
+
+if (els.confirmDialog) {
+  // click on backdrop closes (same pattern as other dialogs)
+  els.confirmDialog.addEventListener("click", (e) => {
+    if (e.target === els.confirmDialog) closeResetConfirmDialog();
+  });
+}
+
+// Export Entries Data
 function openExportDialog() {
   if (!els.exportDialog || !els.exportText) return;
 
-  const payload = {
-    ...state,
-    exportedAt: new Date().toISOString(),
-  };
-
-  const json = JSON.stringify(payload, null, 2);
-  els.exportText.value = json;
-
+  const payload = { ...state, exportedAt: new Date().toISOString() };
+  els.exportText.value = JSON.stringify(payload, null, 2);
   els.exportDialog.showModal();
 }
 
@@ -1955,23 +2770,14 @@ if (els.copyExport) {
 }
 
 if (els.downloadExport) {
-  els.downloadExport.addEventListener("click", () => {
+  els.downloadExport.addEventListener("click", (e) => {
+    e.preventDefault(); // wichtig, falls Button in <form>
     const d = dict();
-    const json = els.exportText.value;
+    const json = String(els.exportText?.value || "");
+    if (!json.trim()) return alert(state.lang === "de" ? "Export ist leer – bitte erst Export öffnen." : "Export is empty – open export first.");
 
-    const blob = new Blob([json], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = d.ui.exportFilename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    URL.revokeObjectURL(url);
-
-    if (els.exportDialog?.open) els.exportDialog.close();
+    const filename = (d?.ui?.exportFilename || "klassenkasse-export.json");
+    downloadTextFile(filename, json, "application/json;charset=utf-8");
   });
 }
 
@@ -1981,9 +2787,28 @@ if (els.closeExport) {
   });
 }
 
+// Export Transaction history
+function csvEscape(value) {
+  const s = String(value ?? "");
+  return `"${s.replaceAll('"', '""')}"`;
+}
+
+function toCsv(rows, headers, separator = ";") {
+  const head = headers.map(csvEscape).join(separator);
+  const body = rows.map(r => r.map(csvEscape).join(separator)).join("\n");
+  // UTF-8 BOM helps Excel (DE) to read umlauts correctly
+  return "\ufeff" + head + "\n" + body + "\n";
+}
+
+function eurNumber(cents) {
+  // for CSV: numeric string without currency symbol; DE uses comma, but Excel usually handles either.
+  return ((cents || 0) / 100).toFixed(2);
+}
+
 /** ---------- init ---------- **/
-(function initFromUrl() {
+(function initLangFromUrl(){
   const urlLang = new URLSearchParams(location.search).get("lang");
   if (urlLang) state.lang = normalizeLang(urlLang);
 })();
+
 renderAll();
