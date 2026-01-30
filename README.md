@@ -1,124 +1,116 @@
-# Klassenkasse (Class Fund Manager)
+🇬🇧 English | 🇩🇪 [Deutsch](README.de.md)
 
-**Klassenkasse** ist eine kleine, datenschutzfreundliche Web-App zur Verwaltung von Klassengeldern
-(z. B. Bastelbeiträge, Ausflüge, Klassenfeste).
+# ClassFund / Klassenkasse
 
-- Läuft **im Browser**  
-- **Keine Registrierung**, kein Server, keine Datenbank  
-- Daten bleiben lokal (LocalStorage) + **Import/Export (JSON)**  
-- Familien-Saldo automatisch durch Ein-/Auszahlungen & Klassen-Ausgaben  
-- E-Mail-Vorlagen erstellen (copy/paste in dein Mailprogramm)  
-- Mehrsprachig: **Deutsch / English**
+**ClassFund** is a free, privacy-friendly web app for managing class funds
+(*“Klassenkasse”*), built for parents, classes, and schools.
 
----
+No login. No cloud. No tracking.
+All data is stored **locally in your browser**.
 
-## Warum diese App?
-
-In vielen Klassen werden Beiträge pro Kind/Familie eingesammelt und Ausgaben anteilig verteilt.
-Oft passiert das in Zetteln, WhatsApp, Excel oder chaotischen Listen.
-
-Diese App hilft dir:
-
-- Familien + Kinder sauber zu verwalten (Kinder sind Labels; später können mehrere Kinder pro Familie kommen)
-- einen **Saldo je Familie** zu führen (positiv/grün, negativ/rot)
-- **Klassen-Ausgaben** fair zu verteilen (alle oder ausgewählte Kinder)
-- **Übersichten** schnell zu exportieren / verschicken
+👉 Live app: https://www.classfund.app
 
 ---
 
-## Features (v1.1)
+## Features
 
-### Verwaltung
-- Familien (Primär) mit:
-  - Elternnamen
-  - E-Mail-Adresse
-  - Kind-Label (pro Familie erstmal 1 Kind; erweiterbar)
-  - Aktiv/Inaktiv (Inaktive erscheinen nicht in Dropdowns)
-- Saldo-Anzeige pro Familie (farblich)
-
-### Buchungen
-- Einzahlungen (z. B. „20 € Bastelbeitrag“)
-- Auszahlungen:
-  - direkt für eine Familie oder
-  - **Klassen-Ausgabe** (Gesamtbetrag wird auf ausgewählte Kinder/Familien verteilt)
-
-### Reminder & Zielbetrag (v1.1)
-- Optional: **Zielbetrag pro Kind/Familie** (z. B. 25 € fürs Halbjahr)
-- Reminder-Batch: erzeugt Textvorschläge für Sammel-Mails an Familien, die noch offen sind
-
-### Export / Import
-- Export als **JSON** (vollständiges Backup)
-- Import aus **JSON** 
-
-### Datenschutz
-- Die App speichert Daten nur lokal in deinem Browser (LocalStorage).
-- Keine Server-Kommunikation, keine Cookies (außer LocalStorage).
+- 👨‍👩‍👧 Family accounts with individual balances
+- 💶 Record deposits (bank transfers, cash, etc.)
+- 📤 Split class expenses fairly across selected families
+- 📊 Automatic balance calculation per family
+- 🏦 Bank reconciliation overview (deposits vs expenses)
+- ⚠️ Duplicate booking detection
+- 📩 Reminder emails (batch mode via mail client)
+- 📁 Export & import (JSON backup)
+- 📄 CSV export for bank statement comparison
+- 🌍 German & English UI
+- 🛡️ GDPR-friendly by design
 
 ---
 
-## Installation / Nutzung
+## Privacy & Data Protection
 
-- go to `https://resetete.github.io/klassenkasse/`
+- No user accounts
+- No backend
+- No cookies
+- No tracking
+- No data leaves your device
 
----
+All data is stored in **localStorage** in your browser.
 
-## Hinweise zur Datensicherheit
-
-- Daten liegen im Browser des Geräts, auf dem du arbeitest.
-- Wenn du Browser-Daten löschst, sind sie weg → nutze **Export (JSON)** als Backup.
-- Für echte „gemeinsame Online-Nutzung“ wäre ein Server nötig (nicht Ziel dieses Tools).
-
----
-
-# Class Fund (English)
-
-**Class Fund** is a small, privacy-friendly web app to manage class money
-(e.g. craft supplies, field trips, class parties).
-
-- Works in the browser  
-- **No signup**, no backend, no database  
-- **Local storage only** + **Import/Export (JSON & CSV)
-- Family-based balances with deposits/withdrawals & shared class expenses  
-- Email templates (copy/paste into your email client)  
-- Languages: **German / English**
+⚠️ Important:
+Local browser storage can be deleted (e.g. clearing browser data, private mode,
+changing devices).
+**Please export backups regularly.**
 
 ---
 
-## Why?
+## How the accounting works
 
-Many classes collect small contributions per child/family and spend it on activities.
-This tool replaces messy notes and spreadsheets with a clear, simple workflow.
+- **Deposits**
+  Money paid by families into the class fund
+
+- **Expenses**
+  Total class expenses (e.g. trips, materials, gifts)
+
+- **Allocations**
+  Each expense is split across selected families and recorded internally
+  (used for per-family balances, not bank balance)
+
+- **Bank balance**
+  `Total deposits – total expenses`
+  This should match your real bank account balance.
 
 ---
 
-## Usage
+## Export & Backup
 
-Go to: `https://resetete.github.io/klassenkasse/`
+You can export all data at any time:
 
-## Features (v1.1)
+- **JSON export**
+  Full backup (recommended before browser cleanup or device change)
 
-### Management
-- Families (primary entity) with:
-  - parent names
-  - email address
-  - child label (v1: one child per family; extensible)
-  - active/inactive flag (inactive families won’t appear in class-expense dropdowns)
-- Balance color indicators (green / red)
+- **CSV (bank) export**
+  Deposits and expenses in bank-friendly format for reconciliation
 
-### Transactions
-- Deposits (e.g. “€20 craft fee”)
-- Withdrawals:
-  - for one family, or
-  - **class expense** split across selected children/families
+---
 
-### Target amount + Reminder Batch (v1.1)
-- Optional target amount per child/family (e.g. €25 per term)
-- Reminder batch: generates email text for families with outstanding balance
+## Reminder Emails
 
-### Import / Export
-- Export **JSON** (full backup)
-- Import **JSON**
+ClassFund can generate reminder emails:
 
-### Privacy
-- Data stays in your browser (LocalStorage).
+- Select families below target or with negative balance
+- Uses your local mail app (`mailto:`)
+- No emails are sent automatically
+- Fully editable templates
 
+---
+
+## Languages
+
+- English 🇬🇧
+- German 🇩🇪
+
+Language can be switched directly in the app.
+
+---
+
+## Tech Stack
+
+- Plain HTML, CSS, JavaScript
+- No frameworks
+- No build step
+- Runs entirely in the browser
+
+---
+
+## License
+
+MIT License
+
+---
+
+## Credits
+
+Made with ❤️ in Berlin
+by [Theresa Mannschatz](https://theresamannschatz.design)
