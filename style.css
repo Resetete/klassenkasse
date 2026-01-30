@@ -556,6 +556,18 @@ details.detailsCard .btn--primary{
   border-color: #f5d0fe;
 }
 
+.badge--cat-bank-fees {
+  background: #9e459f;
+  color: #fdf4ff;
+  border-color: #f5d0fe;
+}
+
+.badge--cat-reise {
+  background: #b56a24;
+  color: #fdf4ff;
+  border-color: #f5d0fe;
+}
+
 /* Veranstaltung */
 .badge--cat-veranstaltung {
   background: #660d64;
@@ -585,9 +597,7 @@ details.detailsCard .btn--primary{
 }
 
 /* paper theme tuning */
-html[data-theme="paper"] .badge--category{
-  background-opacity: .9;
-}
+html[data-theme="paper"] .badge--category { opacity: .95; }
 
 /* ==============================
    Footer

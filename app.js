@@ -174,7 +174,6 @@ const I18N = {
       reminderBtn: "Reminders",
       exportBtn: "Export",
       downloadBankCsvBtn: "CSV (Bank) Download",
-      downloadAllCsvBtn: "CSV (All) Download",
       importBtn: "Import",
       resetBtn: "Reset",
 
@@ -427,6 +426,68 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
+const CATEGORY_DEFS = {
+  deposit: {
+    de: "Einzahlung",
+    en: "Deposit",
+    class: "badge--cat-einzahlung",
+  },
+  trip: {
+    de: "Ausflug",
+    en: "Trip",
+    class: "badge--cat-ausflug",
+  },
+  travel: {
+    de: "Reise",
+    en: "Travel",
+    class: "badge--cat-reise",
+  },
+  material: {
+    de: "Material",
+    en: "Material",
+    class: "badge--cat-material",
+  },
+  gift: {
+    de: "Geschenk",
+    en: "Gift",
+    class: "badge--cat-geschenk",
+  },
+  fees: {
+    de: "Bankgebühren",
+    en: "Bank fees",
+    class: "badge--cat-bank-fees",
+  },
+  event: {
+    de: "Veranstaltung",
+    en: "Event",
+    class: "badge--cat-veranstaltung",
+  },
+  other: {
+    de: "Sonstiges",
+    en: "Other",
+    class: "badge--cat-unkategorisiert",
+  },
+};
+
+function mapLegacyCategoryToKey(raw) {
+  if (!raw) return "other";
+
+  const value = String(raw).trim();
+
+  // already a valid key?
+  if (CATEGORY_DEFS[value]) return value;
+
+  // match DE / EN labels
+  for (const [key, def] of Object.entries(CATEGORY_DEFS)) {
+    if (def.de === value || def.en === value) {
+      return key;
+    }
+  }
+
+  // fallback
+  return "other";
+}
+
 /** ---------- state ---------- **/
 function defaultState() {
   return {
@@ -437,12 +498,18 @@ function defaultState() {
     families: [],
     tx: [],
     expenses: [],
-    categories: ["Einzahlung", "Ausflug", "Reise", "Material", "Geschenk", "Veranstaltung", "Sonstiges"],
+    categories: Object.keys(CATEGORY_DEFS),
 
     // "all" = preselect all eligible, allow uncheck
     // "custom" = start empty, user checks families
     expenseSelectMode: "all",
   };
+}
+
+function categoryLabel(key) {
+  const def = CATEGORY_DEFS[key];
+  if (!def) return key;
+  return def[state.lang] || def.en || key;
 }
 
 let state = loadState();
@@ -463,7 +530,10 @@ function loadState() {
     const families = Array.isArray(parsed.families) ? parsed.families : [];
     const tx = Array.isArray(parsed.tx) ? parsed.tx : [];
     const expenses = Array.isArray(parsed.expenses) ? parsed.expenses : [];
-    const categories = Array.isArray(parsed.categories) ? parsed.categories.filter(Boolean).map(String) : base.categories;
+
+    const categories = Array.isArray(parsed.categories)
+      ? Array.from(new Set(parsed.categories.filter(Boolean).map(mapLegacyCategoryToKey)))
+      : base.categories;
 
     const expenseSelectMode = parsed.expenseSelectMode === "custom" ? "custom" : "all";
 
@@ -496,7 +566,7 @@ function loadState() {
         dateISO: typeof t.dateISO === "string" ? t.dateISO : todayISO(),
         note: typeof t.note === "string" ? t.note.slice(0, 120) : "",
         createdAt: Number.isFinite(t.createdAt) ? t.createdAt : Date.now(),
-        category: typeof t.category === "string" ? t.category.slice(0, 40) : null,
+        category: mapLegacyCategoryToKey(t.category),
         expenseId: typeof t.expenseId === "string" ? t.expenseId : null,
       })),
       expenses: expenses.map((e) => ({
@@ -505,7 +575,7 @@ function loadState() {
         totalCents: Number.isFinite(e.totalCents) ? e.totalCents : 0,
         dateISO: typeof e.dateISO === "string" ? e.dateISO : todayISO(),
         participantIds: Array.isArray(e.participantIds) ? e.participantIds.filter(Boolean) : [],
-        category: typeof e.category === "string" ? e.category.slice(0, 40) : null,
+        category: mapLegacyCategoryToKey(e.category),
         perFamilyCentsMap: e.perFamilyCentsMap && typeof e.perFamilyCentsMap === "object" ? e.perFamilyCentsMap : {},
         createdAt: Number.isFinite(e.createdAt) ? e.createdAt : Date.now(),
       })),
@@ -648,63 +718,40 @@ function uncategorizedLabel() {
   return dict().text.uncategorized || (state.lang === "de" ? "Unkategorisiert" : "Uncategorized");
 }
 
-function normalizeCategory(raw) {
-  const v = String(raw || "").trim().slice(0, 40);
-  return v || uncategorizedLabel();
-}
-
-function categoryClass(cat) {
-  switch (normalizeCategory(cat).toLowerCase()) {
-    case "material":
-      return "badge--cat-material";
-    case "ausflug":
-      return "badge--cat-ausflug";
-    case "geschenk":
-      return "badge--cat-geschenk";
-    case "veranstaltung":
-      return "badge--cat-veranstaltung";
-    case "essen":
-      return "badge--cat-essen";
-    case "einzahlung":
-      return "badge--cat-einzahlung";
-    default:
-      return "badge--cat-unkategorisiert";
-  }
-}
-
-function categoryBadge(cat) {
-  const label = escapeHtml(normalizeCategory(cat));
-  const cls = categoryClass(cat);
+function categoryBadge(catKey) {
+  const def = CATEGORY_DEFS[catKey] || CATEGORY_DEFS.other;
+  const label = escapeHtml(categoryLabel(catKey));
+  const cls = def.class || "badge--cat-unkategorisiert";
   return `<span class="badge badge--category ${cls}">${label}</span>`;
 }
 
-function ensureCategoryExists(cat) {
-  const c = normalizeCategory(cat);
-  if (!state.categories.includes(c) && c !== uncategorizedLabel()) {
-    state.categories.push(c);
-    state.categories.sort((a, b) => a.localeCompare(b));
+function ensureCategoryExists(raw) {
+  const key = mapLegacyCategoryToKey(raw);
+
+  if (!state.categories.includes(key)) {
+    state.categories.push(key);
+    state.categories.sort();
   }
-  return c;
+  return key;
 }
 
 function renderCategoryPickers() {
   const cats = (state.categories || []).slice();
-  const unc = uncategorizedLabel();
-  if (!cats.includes(unc)) cats.unshift(unc);
+  if (!cats.includes("other")) cats.unshift("other");
 
   function fillSelect(sel) {
     if (!sel) return;
     const current = sel.value;
     sel.innerHTML = "";
-    for (const c of cats) {
+
+    for (const key of cats) {
       const opt = document.createElement("option");
-      opt.value = c;
-      opt.textContent = c;
+      opt.value = key;
+      opt.textContent = categoryLabel(key);
       sel.appendChild(opt);
     }
-    // keep selection if possible
-    if (cats.includes(current)) sel.value = current;
-    else sel.value = unc;
+
+    sel.value = cats.includes(current) ? current : "other";
   }
 
   fillSelect(els.depositCategory);
@@ -1101,7 +1148,7 @@ function reportTextForCopy(familyId) {
     // it.title kommt aktuell schon aus state.lang (de/en), passt also
     const sign = it.amountCentsSigned >= 0 ? "+" : "–";
     const note = it.note ? ` · ${it.note}` : "";
-    lines.push(`- ${it.dateISO} · ${it.title} · ${sign}${formatEUR(Math.abs(it.amountCentsSigned))}`);
+    lines.push(`- ${it.dateISO} · ${it.title}${note} · ${sign}${formatEUR(Math.abs(it.amountCentsSigned))}`);
   }
 
   return lines.join("\n");
@@ -1295,7 +1342,7 @@ function doImportFromPendingFile() {
       expenseSelection.clear();
       renderAll();
 
-      setImportStatus(state.lang === "de" ? "✅ Import erfolgreich." : "✅ Import successful.", "ok");
+      setImportStatus(state.lang === "de" ? "Import erfolgreich." : "Import successful.", "ok");
 
       // auto-close after short delay (UX-friendly)
       setTimeout(() => closeImportDialog(), 500);
@@ -1563,46 +1610,38 @@ function ensureExpenseSelection(dateISO) {
 function renderCategoryOverview() {
   if (!els.categoryOverview) return;
 
-  const unc = uncategorizedLabel();
-  const map = new Map(); // cat -> {inCents, outCents}
+  const map = new Map(); // key -> {inCents,outCents}
 
-  function bump(cat, key, cents) {
-    const c = normalizeCategory(cat);
-    if (!map.has(c)) map.set(c, { inCents: 0, outCents: 0 });
-    map.get(c)[key] += cents;
+  function ensureRow(k) {
+    if (!map.has(k)) map.set(k, { inCents: 0, outCents: 0 });
+    return map.get(k);
   }
 
-  // deposits (income)
+  function bump(catKeyRaw, field, cents) {
+    const k = mapLegacyCategoryToKey(catKeyRaw);
+    const row = ensureRow(k);
+    row[field] += cents;
+  }
+
+  // Deposits -> In
   for (const t of state.tx) {
     if (t.type !== "deposit") continue;
-    bump(t.category || unc, "inCents", Math.max(0, t.centsSigned || 0));
+    bump(t.category || "other", "inCents", Math.max(0, t.centsSigned || 0));
   }
 
-  // expenses (outgoing) -> use expense objects (totalCents)
+  // Expenses -> Out
   for (const e of state.expenses) {
-    bump(e.category || unc, "outCents", Math.max(0, e.totalCents || 0));
+    bump(e.category || "other", "outCents", Math.max(0, e.totalCents || 0));
   }
 
   const rows = Array.from(map.entries())
-    .map(([cat, v]) => ({ cat, ...v, net: v.inCents - v.outCents }))
-    .sort((a, b) => (b.outCents - a.outCents) || a.cat.localeCompare(b.cat));
+    .map(([key, v]) => ({ key, ...v, net: v.inCents - v.outCents }))
+    .sort((a, b) => (b.outCents - a.outCents) || categoryLabel(a.key).localeCompare(categoryLabel(b.key)));
 
   if (rows.length === 0) {
     els.categoryOverview.innerHTML = `<div class="muted">${escapeHtml(dict().labels.reportNoTx || "No transactions.")}</div>`;
     return;
   }
-
-  const htmlRows = rows.map(r => {
-    const netCls = r.net < 0 ? "neg" : r.net > 0 ? "pos" : "";
-    return `
-      <tr>
-        <td>${escapeHtml(r.cat)}</td>
-        <td style="text-align:right;">${escapeHtml(formatEUR(r.inCents))}</td>
-        <td style="text-align:right;">${escapeHtml(formatEUR(r.outCents))}</td>
-        <td class="${netCls}" style="text-align:right; font-weight:900;">${escapeHtml(formatEUR(r.net))}</td>
-      </tr>
-    `;
-  }).join("");
 
   els.categoryOverview.innerHTML = `
     <table class="catTable">
@@ -1611,10 +1650,19 @@ function renderCategoryOverview() {
           <th>${escapeHtml(state.lang === "de" ? "Kategorie" : "Category")}</th>
           <th style="text-align:right;">${escapeHtml(state.lang === "de" ? "Ein" : "In")}</th>
           <th style="text-align:right;">${escapeHtml(state.lang === "de" ? "Aus" : "Out")}</th>
-          <th style="text-align:right;">${escapeHtml(state.lang === "de" ? "Saldo" : "Net")}</th>
+          <th style="text-align:right;">${escapeHtml(state.lang === "de" ? "Netto" : "Net")}</th>
         </tr>
       </thead>
-      <tbody>${htmlRows}</tbody>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td>${escapeHtml(categoryLabel(r.key))}</td>
+            <td style="text-align:right;">${escapeHtml(formatEUR(r.inCents))}</td>
+            <td style="text-align:right;">${escapeHtml(formatEUR(r.outCents))}</td>
+            <td style="text-align:right; font-weight:900;">${escapeHtml(formatEUR(r.net))}</td>
+          </tr>
+        `).join("")}
+      </tbody>
     </table>
   `;
 }
