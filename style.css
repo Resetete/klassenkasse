@@ -148,6 +148,7 @@ textarea{
 }
 
 input::placeholder, textarea::placeholder{ color: rgba(255,255,255,.35); }
+
 html[data-theme="paper"] input:not([type="checkbox"]):not([type="radio"]),
 html[data-theme="paper"] select,
 html[data-theme="paper"] textarea{ background: rgba(255,255,255,.75); }
@@ -653,9 +654,7 @@ details.detailsCard .btn--primary{
 /* paper theme tuning */
 html[data-theme="paper"] .badge--category { opacity: .95; }
 
-
 /* Mint theme tuning */
-
 html[data-theme="mint"]{
   --bg:#f3fbf7;
   --card: rgba(6,95,70,.06);
@@ -699,7 +698,6 @@ html[data-theme="mint"] body::before{
 
 
 /* SLATE theme tuning */
-
 html[data-theme="slate"]{
   --bg:#0b1220;
   --card: rgba(148,163,184,.08);
