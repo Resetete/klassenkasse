@@ -55,6 +55,11 @@ const I18N = {
       categoriesTitle: "Kategorien",
       uncategorized: "Unkategorisiert",
 
+      schoolYearTitle: "Schuljahr",
+      schoolYearFromLabel: "Schuljahr von",
+      schoolYearToLabel: "Schuljahr bis",
+      schoolYearHint: "Kategorien-Summen werden nur für diesen Zeitraum berechnet.",
+
       classExpenseTitle: "Klassen-Ausgabe aufteilen",
       expenseTitleLabel: "Titel",
       phExpenseTitle: "z. B. Ausflug",
@@ -189,6 +194,11 @@ const I18N = {
       targetAmountLabel: "Target amount per family (€)",
       phTargetAmount: "e.g. 25.00",
       targetHint: "If set: each family should have at least this balance.",
+
+      schoolYearTitle: "School year",
+      schoolYearFromLabel: "School year from",
+      schoolYearToLabel: "School year until",
+      schoolYearHint: "Category totals are calculated only within this range.",
 
       depositTitle: "Contribution",
       dateLabel: "Date",
@@ -499,11 +509,26 @@ function defaultState() {
     tx: [],
     expenses: [],
     categories: Object.keys(CATEGORY_DEFS),
-
     // "all" = preselect all eligible, allow uncheck
     // "custom" = start empty, user checks families
     expenseSelectMode: "all",
+    // needed to filter or group categories by school year
+    schoolYearFromISO: null,
+    schoolYearToISO: null,
   };
+}
+
+function isWithinSchoolYear(dateISO) {
+  if (!dateISO) return false;
+
+  const from = state.schoolYearFromISO;
+  const to = state.schoolYearToISO;
+
+  if (!from && !to) return true;
+
+  if (from && dateISO < from) return false;
+  if (to && dateISO > to) return false;
+  return true;
 }
 
 function categoryLabel(key) {
@@ -578,6 +603,14 @@ function loadState() {
         category: mapLegacyCategoryToKey(e.category),
         perFamilyCentsMap: e.perFamilyCentsMap && typeof e.perFamilyCentsMap === "object" ? e.perFamilyCentsMap : {},
         createdAt: Number.isFinite(e.createdAt) ? e.createdAt : Date.now(),
+      schoolYearFromISO:
+        (typeof parsed.schoolYearFromISO === "string" && isISODate(parsed.schoolYearFromISO))
+          ? parsed.schoolYearFromISO
+          : null,
+      schoolYearToISO:
+        (typeof parsed.schoolYearToISO === "string" && isISODate(parsed.schoolYearToISO))
+          ? parsed.schoolYearToISO
+          : null,
       })),
     };
   } catch {
@@ -607,7 +640,10 @@ const els = {
   familiesCount: document.getElementById("familiesCount"),
   txCount: document.getElementById("txCount"),
 
+  // settings
   targetAmount: document.getElementById("targetAmount"),
+  schoolYearFrom: document.getElementById("schoolYearFrom"),
+  schoolYearTo: document.getElementById("schoolYearTo"),
 
   // reminder dialog
   reminderDialog: document.getElementById("reminderDialog"),
@@ -756,6 +792,38 @@ function renderCategoryPickers() {
 
   fillSelect(els.depositCategory);
   fillSelect(els.expenseCategory);
+}
+
+// School years
+function renderSchoolYearInputs() {
+  if (els.schoolYearFrom) els.schoolYearFrom.value = state.schoolYearFromISO || "";
+  if (els.schoolYearTo) els.schoolYearTo.value = state.schoolYearToISO || "";
+}
+
+function updateSchoolYearFromInputs() {
+  const from = els.schoolYearFrom?.value || "";
+  const to = els.schoolYearTo?.value || "";
+
+  if (from && !isISODate(from)) {
+    alert(state.lang === "de" ? "Ungültiges Startdatum." : "Invalid start date.");
+    return;
+  }
+  if (to && !isISODate(to)) {
+    alert(state.lang === "de" ? "Ungültiges Enddatum." : "Invalid end date.");
+    return;
+  }
+  if (from && to && to < from) {
+    alert(state.lang === "de"
+      ? "Schuljahr bis muss nach Schuljahr von liegen."
+      : "School year end must be after start.");
+    return;
+  }
+
+  state.schoolYearFromISO = from || null;
+  state.schoolYearToISO = to || null;
+
+  saveState();
+  renderCategoryOverview();
 }
 
 /** Only families eligible for a given date are shown/selectable */
@@ -1626,11 +1694,13 @@ function renderCategoryOverview() {
   // Deposits -> In
   for (const t of state.tx) {
     if (t.type !== "deposit") continue;
+    if (!isWithinSchoolYear(t.dateISO)) continue;
     bump(t.category || "other", "inCents", Math.max(0, t.centsSigned || 0));
   }
 
   // Expenses -> Out
   for (const e of state.expenses) {
+    if (!isWithinSchoolYear(e.dateISO)) continue;
     bump(e.category || "other", "outCents", Math.max(0, e.totalCents || 0));
   }
 
@@ -1643,7 +1713,16 @@ function renderCategoryOverview() {
     return;
   }
 
+  const rangeLabel =
+    (state.schoolYearFromISO || state.schoolYearToISO)
+      ? `<div class="muted small" style="margin-bottom:8px;">
+          ${state.lang === "de" ? "Zeitraum:" : "Range:"}
+          ${state.schoolYearFromISO || "…"} → ${state.schoolYearToISO || "…"}
+        </div>`
+      : "";
+
   els.categoryOverview.innerHTML = `
+    ${rangeLabel}
     <table class="catTable">
       <thead>
         <tr>
@@ -2502,6 +2581,7 @@ function renderAll() {
   if (els.expenseDate && !els.expenseDate.value) els.expenseDate.value = todayISO();
 
   renderTargetInput();
+  renderSchoolYearInputs();
   renderDepositFamilyPicker();
   renderCategoryPickers();
   renderExpenseChecklist();
@@ -2535,6 +2615,9 @@ if (els.targetAmount) {
     if (e.key === "Enter") updateTargetFromInput();
   });
 }
+
+if (els.schoolYearFrom) els.schoolYearFrom.addEventListener("change", updateSchoolYearFromInputs);
+if (els.schoolYearTo) els.schoolYearTo.addEventListener("change", updateSchoolYearFromInputs);
 
 if (els.depositDate) {
   els.depositDate.addEventListener("change", () => renderDepositFamilyPicker());

@@ -355,6 +355,11 @@ html[data-theme="paper"] .report{ background: rgba(255,255,255,.75); }
 }
 .report th{ text-align:left; color: var(--muted); font-weight: 800; }
 
+.timeRange{
+  padding-left: 2px;
+  color: red;
+}
+
 /* Category tables */
 .categoryOverview{
   border:1px solid var(--stroke);
