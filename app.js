@@ -519,13 +519,10 @@ function defaultState() {
 }
 
 function isWithinSchoolYear(dateISO) {
-  if (!dateISO) return false;
-
+  if (!dateISO) return true;
   const from = state.schoolYearFromISO;
   const to = state.schoolYearToISO;
-
   if (!from && !to) return true;
-
   if (from && dateISO < from) return false;
   if (to && dateISO > to) return false;
   return true;
@@ -603,6 +600,7 @@ function loadState() {
         category: mapLegacyCategoryToKey(e.category),
         perFamilyCentsMap: e.perFamilyCentsMap && typeof e.perFamilyCentsMap === "object" ? e.perFamilyCentsMap : {},
         createdAt: Number.isFinite(e.createdAt) ? e.createdAt : Date.now(),
+      })),
       schoolYearFromISO:
         (typeof parsed.schoolYearFromISO === "string" && isISODate(parsed.schoolYearFromISO))
           ? parsed.schoolYearFromISO
@@ -611,7 +609,6 @@ function loadState() {
         (typeof parsed.schoolYearToISO === "string" && isISODate(parsed.schoolYearToISO))
           ? parsed.schoolYearToISO
           : null,
-      })),
     };
   } catch {
     return defaultState();
@@ -823,7 +820,7 @@ function updateSchoolYearFromInputs() {
   state.schoolYearToISO = to || null;
 
   saveState();
-  renderCategoryOverview();
+  renderAll();
 }
 
 /** Only families eligible for a given date are shown/selectable */
@@ -892,8 +889,8 @@ function rebuildExpenseAllocations(expenseId, newTitle, newTotalCents, newDateIS
 }
 
 /** =========================================================
-/** ---------- balances ---------- **/
-/** =========================================================*/
+    ------- balances ----------
+=========================================================*/
 
 function calcBalances() {
   // Per-family balances only for families that still exist in state.families
@@ -2550,6 +2547,32 @@ function applyLangVisibility() {
   });
 }
 
+(function initLangFromUrl(){
+  const urlLang = new URLSearchParams(location.search).get("lang");
+  if (urlLang) state.lang = normalizeLang(urlLang);
+})();
+
+(function normalizePrefsOnBoot() {
+  // lang
+  state.lang = normalizeLang(state.lang);
+
+  // theme
+  const allowedThemes = ["minimal", "paper"];
+  if (!allowedThemes.includes(state.theme)) state.theme = "minimal";
+
+  // school year dates
+  if (state.schoolYearFromISO && !isISODate(state.schoolYearFromISO)) state.schoolYearFromISO = null;
+  if (state.schoolYearToISO && !isISODate(state.schoolYearToISO)) state.schoolYearToISO = null;
+  if (state.schoolYearFromISO && state.schoolYearToISO && state.schoolYearToISO < state.schoolYearFromISO) {
+    // if corrupted, reset both
+    state.schoolYearFromISO = null;
+    state.schoolYearToISO = null;
+  }
+
+  saveState(); // persist cleaned values
+})();
+
+
 function t(key) {
   const d = dict();
   return (d.text && d.text[key]) || key;
@@ -2945,11 +2968,5 @@ function eurNumber(cents) {
   // for CSV: numeric string without currency symbol; DE uses comma, but Excel usually handles either.
   return ((cents || 0) / 100).toFixed(2);
 }
-
-/** ---------- init ---------- **/
-(function initLangFromUrl(){
-  const urlLang = new URLSearchParams(location.search).get("lang");
-  if (urlLang) state.lang = normalizeLang(urlLang);
-})();
 
 renderAll();
