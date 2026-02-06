@@ -44,11 +44,6 @@
           <select id="theme" class="seg__select">
             <option value="minimal">Minimal</option>
             <option value="paper">Paper</option>
-            <option value="mint">Mint</option>
-            <option value="slate">Slate</option>
-            <option value="notebook">Notebook</option>
-            <option value="sky">Sky</option>
-            <option value="mono">Mono</option>
           </select>
         </div>
 
@@ -123,6 +118,23 @@
         </div>
         <p class="hint" data-i18n="targetHint">
           If set: each family should have at least this balance.
+        </p>
+
+        <hr class="hr" />
+
+        <h2 data-i18n="schoolYearTitle">School year</h2>
+        <div class="row2">
+          <div class="field">
+            <label for="schoolYearFrom" data-i18n="schoolYearFromLabel">From</label>
+            <input id="schoolYearFrom" type="date" />
+          </div>
+          <div class="field">
+            <label for="schoolYearTo" data-i18n="schoolYearToLabel">Until</label>
+            <input id="schoolYearTo" type="date" />
+          </div>
+        </div>
+        <p class="hint" data-i18n="schoolYearHint">
+          Category totals are calculated within this range.
         </p>
 
         <hr class="hr" />
