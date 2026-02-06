@@ -20,8 +20,8 @@
   <div class="app">
 
     <!-- =====================================================
-         HEADER
-         ===================================================== -->
+      HEADER
+    ===================================================== -->
     <header class="topbar">
       <div class="topbar__title">
         <h1 data-i18n="appTitle">Class Fund</h1>
@@ -52,19 +52,6 @@
         <button class="btn" id="downloadBankCsvBtn" type="button" data-i18n="downloadBankCsvBtn" >CSV (Bank) Download</button>
         <button class="btn" id="importBtn" type="button" data-i18n="importBtn">Import</button>
         <button class="btn btn--danger" id="resetBtn" type="button" data-i18n="resetBtn">Reset</button>
-      </div>
-
-      <!-- Donate -->
-      <div class="donateButton">
-        <form action="https://www.paypal.com/donate" method="post" target="_top" class="donate">
-          <input type="hidden" name="hosted_button_id" value="UA2Y443NFH76J" />
-          <input
-            type="image"
-            src="https://pics.paypal.com/00/s/NTE0YTZlOWQtZGUwNy00NzU3LWI4ZDYtNWQ2NmYwMTA4YWE2/file.PNG"
-            name="submit"
-            alt="Donate with PayPal"
-          />
-        </form>
       </div>
     </header>
 
@@ -136,6 +123,25 @@
         <p class="hint" data-i18n="schoolYearHint">
           Category totals are calculated within this range.
         </p>
+
+        <hr class="hr" />
+
+        <!-- Donate button -->
+        <div class="supportCard">
+          <div>
+            <div class="supportTitle">Support ClassFund</div>
+            <div class="muted small">If this helps your class, you can buy me a coffee ☕</div>
+          </div>
+          <form action="https://www.paypal.com/donate" method="post" target="_top" class="donate donate--inline">
+            <input type="hidden" name="hosted_button_id" value="UA2Y443NFH76J" />
+            <input
+              type="image"
+              src="https://pics.paypal.com/00/s/NTE0YTZlOWQtZGUwNy00NzU3LWI4ZDYtNWQ2NmYwMTA4YWE2/file.PNG"
+              name="submit"
+              alt="Donate with PayPal"
+            />
+          </form>
+        </div>
 
         <hr class="hr" />
 
