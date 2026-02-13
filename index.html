@@ -258,8 +258,14 @@
             </div>
 
             <div class="field">
-              <label for="email" data-i18n="emailLabel">Email</label>
+              <label for="email" data-i18n="emailLabel">Email Elternteil 1</label>
               <input id="email" type="email" maxlength="120" data-i18n-placeholder="phEmail" />
+              <p class="hint" data-i18n="emailOptionalHint">Optional — reminders/emails are disabled without an email.</p>
+            </div>
+
+            <div class="field">
+              <label for="email2" data-i18n="emailLabel2">Email Elternteil 2</label>
+              <input id="email2" type="email" maxlength="120" data-i18n-placeholder="phEmail" />
               <p class="hint" data-i18n="emailOptionalHint">Optional — reminders/emails are disabled without an email.</p>
             </div>
 
@@ -526,7 +532,7 @@
           </div>
 
           <p class="hint" data-i18n="emailPlaceholdersHint">
-            Placeholders: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}
+            Placeholders: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{email2}}, {{today}}
           </p>
 
           <div class="dialog__actions">
@@ -579,7 +585,7 @@
           </div>
 
           <p class="hint" data-i18n="reminderHint">
-            Placeholders: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}
+            Placeholders: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{email2}}, {{today}}
           </p>
 
           <div class="dialog__actions">
