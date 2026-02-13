@@ -79,7 +79,8 @@ const I18N = {
       phParent1: "Name",
       parent2Label: "Elternteil 2 (optional)",
       phParent2: "Name",
-      emailLabel: "E-Mail",
+      emailLabel: "E-Mail Elternteil 1",
+      emailLabel2: "E-Mail Elternteil 2",
       phEmail: "name@mail.de",
       emailOptionalHint: "Optional — ohne E-Mail sind Erinnerungen/Mails deaktiviert.",
       childrenLabel: "Kinder (kommagetrennt)",
@@ -109,7 +110,7 @@ const I18N = {
       emailTitle: "E-Mail erstellen",
       emailSubjectLabel: "Betreff",
       emailTemplateLabel: "Vorlage",
-      emailPlaceholdersHint: "Platzhalter: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
+      emailPlaceholdersHint: "Platzhalter: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{email2}}, {{today}}",
       openMailBtn: "Mail-App öffnen",
       emailPreviewLabel: "Vorschau",
 
@@ -118,7 +119,7 @@ const I18N = {
       reminderBelowTarget: "Unter Ziel",
       reminderNegativeOnly: "Nur negativ",
       reminderActiveOnly: "Nur aktive Familien",
-      reminderHint: "Platzhalter: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
+      reminderHint: "Platzhalter: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{email2}}, {{today}}",
       copyAllBtn: "Alle kopieren",
       openNextBtn: "Nächste Mail öffnen",
       reminderListLabel: "Empfänger:innen",
@@ -232,7 +233,8 @@ const I18N = {
       phParent1: "Name",
       parent2Label: "Parent 2 (optional)",
       phParent2: "Name",
-      emailLabel: "Email",
+      emailLabel: "Email Parent 1",
+      emailLabel2: "Email Parent 2",
       phEmail: "name@mail.com",
       emailOptionalHint: "Optional — reminders/emails are disabled without an email.",
       childrenLabel: "Children (comma-separated)",
@@ -262,7 +264,7 @@ const I18N = {
       emailTitle: "Create email",
       emailSubjectLabel: "Subject",
       emailTemplateLabel: "Template",
-      emailPlaceholdersHint: "Placeholders: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
+      emailPlaceholdersHint: "Placeholders: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{email2}}, {{today}}",
       openMailBtn: "Open mail app",
       emailPreviewLabel: "Preview",
 
@@ -271,7 +273,7 @@ const I18N = {
       reminderBelowTarget: "Below target",
       reminderNegativeOnly: "Negative only",
       reminderActiveOnly: "Active families only",
-      reminderHint: "Placeholders: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{today}}",
+      reminderHint: "Placeholders: {{parents}}, {{children}}, {{balance}}, {{due}}, {{target}}, {{email}}, {{email2}}, {{today}}",
       copyAllBtn: "Copy all",
       openNextBtn: "Open next email",
       reminderListLabel: "Recipients",
@@ -572,6 +574,7 @@ function loadState() {
         parent1: typeof f.parent1 === "string" ? f.parent1.slice(0, 60) : "",
         parent2: typeof f.parent2 === "string" ? f.parent2.slice(0, 60) : "",
         email: typeof f.email === "string" ? f.email.slice(0, 120) : "",
+        email2: typeof f.email2 === "string" ? f.email2.slice(0, 120) : "",
         children: Array.isArray(f.children) ? f.children.filter(Boolean).map((x) => String(x).slice(0, 60)) : [],
         active: typeof f.active === "boolean" ? f.active : true,
         createdAt: Number.isFinite(f.createdAt) ? f.createdAt : Date.now(),
@@ -695,6 +698,7 @@ const els = {
   parent1: document.getElementById("parent1"),
   parent2: document.getElementById("parent2"),
   email: document.getElementById("email"),
+  email2: document.getElementById("email2"),
   children: document.getElementById("children"),
   activeFrom: document.getElementById("activeFrom"),
   activeTo: document.getElementById("activeTo"),
@@ -1258,6 +1262,7 @@ function openFamilyReport(familyId) {
       ${kids ? `<div>${escapeHtml(state.lang === "de" ? "Kinder: " : "Children: ")}${escapeHtml(kids)}</div>` : ""}
       ${parents && parents !== "—" ? `<div>${escapeHtml(state.lang === "de" ? "Eltern: " : "Parents: ")}${escapeHtml(parents)}</div>` : ""}
       ${f.email ? `<div>${escapeHtml(f.email)}</div>` : ""}
+      ${f.email2 ? `<div>${escapeHtml(f.email2)}</div>` : ""}
       ${f.comment ? `<div>${escapeHtml(f.comment)}</div>` : ""}
       ${period ? `<div>${escapeHtml(period)}</div>` : ""}
     </div>
@@ -1470,6 +1475,7 @@ function applyTemplate(template, family, balanceCents) {
     .replaceAll("{{due}}", formatEUR(due))
     .replaceAll("{{target}}", formatEUR(target))
     .replaceAll("{{email}}", String(family?.email || ""))
+    .replaceAll("{{email2}}", String(family?.email2 || ""))
     .replaceAll("{{today}}", todayISO());
 }
 
@@ -1489,8 +1495,8 @@ function buildReminderRecipients() {
     const due = dueCents(bal);
 
     // only families with email make sense for mailto
-    const email = String(f.email || "").trim();
-    if (!email || !isValidEmail(email)) continue;
+    const emails = [f.email, f.email2].map(e => String(e || "").trim()).filter(isValidEmail);
+    if (emails.length === 0) continue;
 
     if (mode === "negative_only") {
       if (bal < 0) list.push({ f, bal });
@@ -1533,7 +1539,8 @@ function renderReminderList() {
 
     const title = document.createElement("div");
     title.style.fontWeight = "800";
-    title.textContent = `${familyDisplayName(it.f)} · ${it.f.email}`;
+    const emailsShown = [it.f.email, it.f.email2].filter(Boolean).join(" · ");
+    title.textContent = `${familyDisplayName(it.f)} · ${emailsShown}`;
 
     const meta = document.createElement("div");
     meta.className = "muted small";
@@ -1586,9 +1593,14 @@ function openCurrentReminder(subject, template) {
   if (!it) return;
 
   const body = applyTemplate(template, it.f, it.bal);
+  const recipients = [it.f.email, it.f.email2]
+    .map(e => String(e || "").trim())
+    .filter(isValidEmail)
+    .map(encodeURIComponent)
+    .join(",");
 
   const mailto =
-    `mailto:${encodeURIComponent(it.f.email)}` +
+    `mailto:${recipients}` +
     `?subject=${encodeURIComponent(subject)}` +
     `&body=${encodeURIComponent(body)}`;
 
@@ -1921,6 +1933,7 @@ function renderFamilies() {
     if (kids) bits.push((state.lang === "de" ? "Kinder: " : "Children: ") + kids);
     if (parents && parents !== "—") bits.push((state.lang === "de" ? "Eltern: " : "Parents: ") + parents);
     if (f.email) bits.push(f.email);
+    if (f.email2) bits.push(f.email2);
     if (f.comment) bits.push(f.comment);
     if (f.activeFromISO || f.activeToISO) bits.push(`${f.activeFromISO || "…"} → ${f.activeToISO || "…"} `);
     if (!f.active) bits.push(state.lang === "de" ? "inaktiv" : "inactive");
@@ -2111,9 +2124,18 @@ function editFamilyPrompt(familyId) {
   const p2 = prompt(state.lang === "de" ? "Elternteil 2 (optional)" : "Parent 2 (optional)", f.parent2 || "");
   if (p2 === null) return;
 
+  // Email Parent 1
   const em = prompt(state.lang === "de" ? "E-Mail (optional)" : "Email (optional)", f.email || "");
   if (em === null) return;
   if (em && !isValidEmail(em)) {
+    alert(d.errors.emailInvalid);
+    return;
+  }
+
+  // Email Parent 2
+  const em2 = prompt(state.lang === "de" ? "E-Mail (optional)" : "Email (optional)", f.email2 || "");
+  if (em2 === null) return;
+  if (em2 && !isValidEmail(em2)) {
     alert(d.errors.emailInvalid);
     return;
   }
@@ -2162,6 +2184,7 @@ function editFamilyPrompt(familyId) {
   f.parent1 = newP1;
   f.parent2 = newP2;
   f.email = String(em).trim().slice(0, 120);
+  f.email2 = String(em2).trim().slice(0, 120);
   f.comment = String(note).trim().slice(0, 160);
 
   saveState();
@@ -2211,6 +2234,7 @@ function addFamilyFromForm() {
   const p1 = String(els.parent1?.value || "").trim().slice(0, 60);
   const p2 = String(els.parent2?.value || "").trim().slice(0, 60);
   const email = String(els.email?.value || "").trim().slice(0, 120);
+  const email2 = String(els.email2?.value || "").trim().slice(0, 120);
   const children = parseChildrenInput(els.children?.value || "");
   const comment = String(els.familyNote?.value || "").trim().slice(0, 160);
 
@@ -2232,6 +2256,10 @@ function addFamilyFromForm() {
     alert(d.errors.emailInvalid);
     return;
   }
+  if (email2 && !isValidEmail(email2)) {
+    alert(d.errors.emailInvalid);
+    return;
+  }
   if (children.length === 0 && !p1 && !p2) {
     alert(d.errors.familyNameRequired);
     return;
@@ -2246,6 +2274,7 @@ function addFamilyFromForm() {
     parent1: p1,
     parent2: p2,
     email,
+    email2,
     children,
     active: true,
     createdAt: Date.now(),
@@ -2259,6 +2288,7 @@ function addFamilyFromForm() {
   if (els.parent1) els.parent1.value = "";
   if (els.parent2) els.parent2.value = "";
   if (els.email) els.email.value = "";
+  if (els.email2) els.email2.value = "";
   if (els.children) els.children.value = "";
   if (els.familyNote) els.familyNote.value = "";
   if (els.activeFrom) els.activeFrom.value = "";
@@ -2811,9 +2841,14 @@ if (els.copyAllReminders) {
 
     const blocks = reminderRecipients.map((it) => {
       const body = applyTemplate(template, it.f, it.bal);
+      const recipients = [
+        it.f.email,
+        it.f.email2
+      ].filter(e => e && e.trim()); // only valid email addresses
+
       return [
         `---`,
-        `TO: ${it.f.email}`,
+        `TO: ${recipients.join(", ")}`,
         `SUBJECT: ${subject}`,
         ``,
         body,
