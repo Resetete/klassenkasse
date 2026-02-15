@@ -676,6 +676,9 @@ const els = {
   openNextReminder: document.getElementById("openNextReminder"),
   reminderList: document.getElementById("reminderList"),
   reminderCount: document.getElementById("reminderCount"),
+  reminderTemplateKind: document.getElementById("reminderTemplateKind"),
+  reminderIncludeInactive: document.getElementById("reminderIncludeInactive"),
+
 
   // import dialog UX
   importDialog: document.getElementById("importDialog"),
@@ -1457,8 +1460,53 @@ function doImportFromPendingFile() {
 let reminderRecipients = [];
 let reminderCursor = 0;
 
+function currentReminderTemplateKind() {
+  const v = (els.reminderTemplateKind?.value || "reminder").trim();
+  return (v === "overview") ? "overview" : "reminder";
+}
+
+function defaultSubjectForKind(kind) {
+  return kind === "overview" ? defaultOverviewSubject() : defaultReminderSubject();
+}
+
+function defaultTemplateForKind(kind) {
+  return kind === "overview" ? defaultOverviewTemplate() : defaultReminderTemplate();
+}
+
 function defaultReminderSubject() {
   return state.lang === "de" ? "Erinnerung: Klassenkasse" : "Reminder: Class fund";
+}
+
+function defaultOverviewSubject() {
+  return state.lang === "de" ? "Klassenkasse – Kontostandsübersicht" : "Class fund – account overview";
+}
+
+function defaultOverviewTemplate() {
+  if (state.lang === "de") {
+    return [
+      "Hallo {{parents}},",
+      "",
+      "hier ist eine kurze Kontostandsübersicht zur Klassenkasse:",
+      "Aktueller Saldo: {{balance}}",
+      state.targetCents > 0 ? "Ziel: {{target}} · Fehlt noch: {{due}}" : "",
+      "",
+      "Wenn du eine ausführliche Buchungsübersicht brauchst: Ich kann sie dir gerne als PDF senden.",
+      "",
+      "Liebe Grüße",
+    ].filter(Boolean).join("\n");
+  }
+
+  return [
+    "Hi {{parents}},",
+    "",
+    "here’s a quick account overview for the class fund:",
+    "Current balance: {{balance}}",
+    state.targetCents > 0 ? "Target: {{target}} · Due: {{due}}" : "",
+    "",
+    "If you need a detailed transaction report: I can send it as a PDF.",
+    "",
+    "Best regards",
+  ].filter(Boolean).join("\n");
 }
 
 function defaultReminderTemplate() {
@@ -1505,13 +1553,15 @@ function buildReminderRecipients() {
   const mode = els.reminderMode?.value || "below_target";
   const activeOnly = !!els.reminderActiveOnly?.checked;
 
+  const includeInactive = !!els.reminderIncludeInactive?.checked;
+
   const balances = calcFamilyBalances();
   const fams = state.families.slice();
 
   const list = [];
 
   for (const f of fams) {
-    if (activeOnly && !f.active) continue;
+    if (!includeInactive && activeOnly && !f.active) continue;
 
     const bal = balances.get(f.id) || 0;
     const due = dueCents(bal);
@@ -1547,8 +1597,11 @@ function buildReminderRecipients() {
 function renderReminderList() {
   if (!els.reminderList) return;
 
-  const template = els.reminderTemplate?.value || defaultReminderTemplate();
-  const subject = els.reminderSubject?.value || defaultReminderSubject();
+  const kind = currentReminderTemplateKind();
+  const template =
+    (els.reminderTemplate?.value || "").trim() || defaultTemplateForKind(kind);
+  const subject =
+    (els.reminderSubject?.value || "").trim() || defaultSubjectForKind(kind);
 
   els.reminderList.innerHTML = "";
 
@@ -1569,21 +1622,39 @@ function renderReminderList() {
     const due = dueCents(it.bal);
     meta.textContent =
       state.targetCents > 0
-        ? `${state.lang === "de" ? "Saldo" : "Balance"}: ${formatEUR(it.bal)} · ${state.lang === "de" ? "Fehlt" : "Due"}: ${formatEUR(due)}`
+        ? `${state.lang === "de" ? "Saldo" : "Balance"}: ${formatEUR(it.bal)} · ${
+            state.lang === "de" ? "Fehlt" : "Due"
+          }: ${formatEUR(due)}`
         : `${state.lang === "de" ? "Saldo" : "Balance"}: ${formatEUR(it.bal)}`;
 
     left.appendChild(title);
     left.appendChild(meta);
 
-    const btn = document.createElement("button");
-    btn.className = "btn btn--primary";
-    btn.type = "button";
-    btn.textContent = state.lang === "de" ? "Öffnen" : "Open";
-    btn.addEventListener("click", () => {
+    const btnWrap = document.createElement("div");
+    btnWrap.style.display = "flex";
+    btnWrap.style.gap = "8px";
+    btnWrap.style.flexShrink = "0";
+
+    const openBtn = document.createElement("button");
+    openBtn.className = "btn btn--primary";
+    openBtn.type = "button";
+    openBtn.textContent = state.lang === "de" ? "Mail öffnen" : "Open mail";
+    openBtn.addEventListener("click", () => {
       reminderCursor = idx;
       openCurrentReminder(subject, template);
-      renderReminderList(); // refresh highlight
+      renderReminderList();
     });
+
+    const reportBtn = document.createElement("button");
+    reportBtn.className = "btn";
+    reportBtn.type = "button";
+    reportBtn.textContent = state.lang === "de" ? "Report / PDF" : "Report / PDF";
+    reportBtn.addEventListener("click", () => {
+      openFamilyReport(it.f.id);
+    });
+
+    btnWrap.appendChild(openBtn);
+    btnWrap.appendChild(reportBtn);
 
     if (idx === reminderCursor) {
       row.style.outline = "2px solid var(--stroke)";
@@ -1597,7 +1668,7 @@ function renderReminderList() {
     row.style.justifyContent = "space-between";
     row.style.gap = "12px";
     row.appendChild(left);
-    row.appendChild(btn);
+    row.appendChild(btnWrap);
 
     els.reminderList.appendChild(row);
   });
@@ -1609,6 +1680,7 @@ function renderReminderList() {
         : `${reminderRecipients.length} recipients`;
   }
 }
+
 
 function openCurrentReminder(subject, template) {
   const it = reminderRecipients[reminderCursor];
@@ -1632,12 +1704,14 @@ function openCurrentReminder(subject, template) {
 function openReminderDialog() {
   if (!els.reminderDialog) return;
 
+  const kind = currentReminderTemplateKind();
+
   // Defaults if empty
   if (els.reminderSubject && !String(els.reminderSubject.value || "").trim()) {
-    els.reminderSubject.value = defaultReminderSubject();
+    els.reminderSubject.value = defaultSubjectForKind(kind);
   }
   if (els.reminderTemplate && !String(els.reminderTemplate.value || "").trim()) {
-    els.reminderTemplate.value = defaultReminderTemplate();
+    els.reminderTemplate.value = defaultTemplateForKind(kind);
   }
 
   reminderRecipients = buildReminderRecipients();
@@ -2857,6 +2931,18 @@ if (els.reminderDialog) {
   els.reminderDialog.addEventListener("click", (e) => {
     if (e.target === els.reminderDialog) closeReminderDialog();
   });
+}
+
+if (els.reminderTemplateKind) {
+  els.reminderTemplateKind.addEventListener("change", () => {
+    const kind = currentReminderTemplateKind();
+    els.reminderSubject.value = defaultSubjectForKind(kind);
+    els.reminderTemplate.value = defaultTemplateForKind(kind);
+    refreshReminderDialog();
+  });
+}
+if (els.reminderIncludeInactive) {
+  els.reminderIncludeInactive.addEventListener("change", refreshReminderDialog);
 }
 
 // Refresh list when criteria changes
