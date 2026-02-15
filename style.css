@@ -253,6 +253,45 @@ html[data-theme="paper"] .summary__item{ background: rgba(255,255,255,.65); }
 }
 html[data-theme="paper"] .familyCard{ background: rgba(255,255,255,.65); }
 
+/* Inactive family styling */
+.familyCard.isInactive{
+  opacity: .55;
+  filter: grayscale(.2);
+}
+
+.familyCard.isInactive .familyName{
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: rgba(255,255,255,.25);
+}
+
+.familyCard.isInactive .amount{
+  opacity: .75;
+}
+
+/* Optional: make actions slightly deemphasized */
+.familyCard.isInactive .btn{
+  opacity: .9;
+}
+
+/* If you want the toggle button to look "warning-ish" when active -> deactivation */
+.familyCard .btn.toggleActiveBtn.isDeactivate{
+  background: rgba(239,68,68,.14);
+  border-color: rgba(239,68,68,.45);
+}
+.familyCard .btn.toggleActiveBtn.isDeactivate:hover{
+  background: rgba(239,68,68,.20);
+}
+
+/* If inactive -> activation button can look positive */
+.familyCard .btn.toggleActiveBtn.isActivate{
+  background: rgba(34,197,94,.14);
+  border-color: rgba(34,197,94,.45);
+}
+.familyCard .btn.toggleActiveBtn.isActivate:hover{
+  background: rgba(34,197,94,.20);
+}
+
 .familyTop{
   display:flex;
   justify-content:space-between;
