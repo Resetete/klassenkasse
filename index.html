@@ -304,6 +304,18 @@
       <!-- ================= RIGHT COLUMN ================= -->
       <section class="card">
         <h2 data-i18n="familiesTitle">Families</h2>
+        <div class="familyFilter">
+          <label class="toggle">
+            <input type="checkbox" id="showActiveFamilies" checked />
+            <span data-i18n="showActiveFamilies">Active</span>
+          </label>
+
+          <label class="toggle">
+            <input type="checkbox" id="showInactiveFamilies" />
+            <span data-i18n="showInactiveFamilies">Inactive</span>
+          </label>
+        </div>
+
         <div id="familiesList" class="families"></div>
 
         <hr class="hr" />
@@ -556,6 +568,11 @@
         <strong data-i18n="reminderTitle">Reminder batch</strong>
         <button class="btn btn--icon" id="closeReminder" type="button" aria-label="Close">✕</button>
       </div>
+
+      <select id="reminderTemplateKind">
+        <option value="reminder">Erinnerung</option>
+        <option value="overview">Kontostandsübersicht</option>
+      </select>
 
       <div class="reminderTop">
         <div class="seg">

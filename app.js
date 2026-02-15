@@ -93,6 +93,8 @@ const I18N = {
       familyHint: "Tipp: Inaktive Familien werden aus Auswahlfeldern ausgeschlossen, bleiben aber in der Historie.",
 
       familiesTitle: "Familien",
+      showActiveFamilies: "Aktive Familien",
+      showInactiveFamilies: 'Inaktive Familien',
       ledgerTitle: "Buchungsverlauf",
       ledgerHistoryHint: "Liste aller Ein- und Ausgaben",
       emptyState: "Noch keine Buchungen.",
@@ -247,6 +249,8 @@ const I18N = {
       familyHint: "Tip: inactive families are excluded from selections, but remain in history.",
 
       familiesTitle: "Families",
+      showActiveFamilies: "Active Families",
+      showInactiveFamilies: 'Inactive Families',
       ledgerTitle: "History of transactions",
       ledgerHistoryHint: "List of all deposits and expenses",
       emptyState: "No transactions yet.",
@@ -517,6 +521,10 @@ function defaultState() {
     // needed to filter or group categories by school year
     schoolYearFromISO: null,
     schoolYearToISO: null,
+    familyListFilter: {
+      showActive: true,
+      showInactive: false,
+    },
   };
 }
 
@@ -561,6 +569,13 @@ function loadState() {
 
     const expenseSelectMode = parsed.expenseSelectMode === "custom" ? "custom" : "all";
 
+    const familyListFilter = parsed.familyListFilter && typeof parsed.familyListFilter === "object"
+      ? {
+          showActive: parsed.familyListFilter.showActive !== false, // default true
+          showInactive: !!parsed.familyListFilter.showInactive,     // default false
+        }
+      : { showActive: true, showInactive: false };
+
     return {
       ...base,
       ...parsed,
@@ -569,6 +584,7 @@ function loadState() {
       targetCents,
       expenseSelectMode,
       categories,
+      familyListFilter,
       families: families.map((f) => ({
         id: f.id || uid(),
         parent1: typeof f.parent1 === "string" ? f.parent1.slice(0, 60) : "",
@@ -640,6 +656,10 @@ const els = {
   familiesCount: document.getElementById("familiesCount"),
   txCount: document.getElementById("txCount"),
 
+  // Family overview cards
+  showActiveFamilies: document.getElementById("showActiveFamilies"),
+  showInactiveFamilies: document.getElementById("showInactiveFamilies"),
+
   // settings
   targetAmount: document.getElementById("targetAmount"),
   schoolYearFrom: document.getElementById("schoolYearFrom"),
@@ -656,6 +676,9 @@ const els = {
   openNextReminder: document.getElementById("openNextReminder"),
   reminderList: document.getElementById("reminderList"),
   reminderCount: document.getElementById("reminderCount"),
+  reminderTemplateKind: document.getElementById("reminderTemplateKind"),
+  reminderIncludeInactive: document.getElementById("reminderIncludeInactive"),
+
 
   // import dialog UX
   importDialog: document.getElementById("importDialog"),
@@ -673,6 +696,7 @@ const els = {
   cancelReset: document.getElementById("cancelReset"),
   confirmReset: document.getElementById("confirmReset"),
 
+  // deposits
   depositDate: document.getElementById("depositDate"),
   depositFamily: document.getElementById("depositFamily"),
   depositAmount: document.getElementById("depositAmount"),
@@ -683,6 +707,7 @@ const els = {
   expenseCategory: document.getElementById("expenseCategory"),
   categoryOverview: document.getElementById("categoryOverview"),
 
+  // expenses
   expenseDate: document.getElementById("expenseDate"),
   expenseTitle: document.getElementById("expenseTitle"),
   expenseAmount: document.getElementById("expenseAmount"),
@@ -1435,30 +1460,87 @@ function doImportFromPendingFile() {
 let reminderRecipients = [];
 let reminderCursor = 0;
 
+function currentReminderTemplateKind() {
+  const v = (els.reminderTemplateKind?.value || "reminder").trim();
+  return (v === "overview") ? "overview" : "reminder";
+}
+
+function defaultSubjectForKind(kind) {
+  return kind === "overview" ? defaultOverviewSubject() : defaultReminderSubject();
+}
+
+function defaultTemplateForKind(kind) {
+  return kind === "overview" ? defaultOverviewTemplate() : defaultReminderTemplate();
+}
+
 function defaultReminderSubject() {
   return state.lang === "de" ? "Erinnerung: Klassenkasse" : "Reminder: Class fund";
+}
+
+function defaultOverviewSubject() {
+  return state.lang === "de" ? "Klassenkasse – Kontostandsübersicht" : "Class fund – account overview";
+}
+
+function defaultOverviewTemplate() {
+  if (state.lang === "de") {
+    return [
+      "Liebe {{parents}},",
+      "",
+      "hier ist eine kurze Kontostandsübersicht zur Klassenkasse:",
+      "Aktueller Saldo: {{balance}}",
+      state.targetCents > 0 ? "Ziel: {{target}} · Fehlt noch: {{due}}" : "",
+      "",
+      "Im Anhang ist eine ausführliche Buchungsübersicht als PDF.",
+      "",
+      "Liebe Grüße",
+    ].filter(Boolean).join("\n");
+  }
+
+  return [
+    "Dear {{parents}},",
+    "",
+    "Please find below a short overview of the class fund account:",
+    "Current balance: {{balance}}",
+    state.targetCents > 0 ? "Target: {{target}} · Outstanding amount: {{due}}" : "",
+    "",
+    "A detailed transaction overview is attached as a PDF.",
+    "",
+    "Kind regards",
+  ].filter(Boolean).join("\n");
 }
 
 function defaultReminderTemplate() {
   if (state.lang === "de") {
     return [
-      "Hallo {{parents}},",
+      "Liebe {{parents}},",
       "",
-      "kurze Erinnerung zur Klassenkasse:",
-      "Aktueller Stand: {{balance}}",
-      state.targetCents > 0 ? "Ziel: {{target}} · Fehlt noch: {{due}}" : "",
+      "eine kleine Erinnerung zur Klassenkasse",
       "",
-      "Danke & liebe Grüße",
+      "Aktueller Kontostand: {{balance}}",
+      state.targetCents > 0
+        ? "Wir streben als gemeinsames Klassenguthaben {{target}} an. Aktuell fehlen noch {{due}}."
+        : "",
+      "",
+      "Die Klassenkasse hilft uns, Ausflüge, Materialien und gemeinsame Aktivitäten unkompliziert zu finanzieren.",
+      "Vielen Dank für die Unterstützung!",
+      "",
+      "Liebe Grüße",
     ].filter(Boolean).join("\n");
   }
   return [
-    "Hi {{parents}},",
+   "Dear {{parents}},",
     "",
-    "quick reminder about the class fund:",
+    "Just a quick reminder about the class fund.",
+    "",
     "Current balance: {{balance}}",
-    state.targetCents > 0 ? "Target: {{target}} · Due: {{due}}" : "",
+    state.targetCents > 0
+      ? "Our goal for the class fund is {{target}}. Currently, {{due}} is still missing."
+      : "",
     "",
-    "Thank you!",
+    "The class fund helps us cover trips, materials and shared activities easily.",
+    "Thanks a lot for your support!",
+    "",
+    "Kind regards",
   ].filter(Boolean).join("\n");
 }
 
@@ -1480,8 +1562,10 @@ function applyTemplate(template, family, balanceCents) {
 }
 
 function buildReminderRecipients() {
-  const mode = els.reminderMode?.value || "below_target";
+  const kind = currentReminderTemplateKind(); // "reminder" | "overview"
+  const mode = els.reminderMode?.value || "below_target"; // "below_target" | "negative_only"
   const activeOnly = !!els.reminderActiveOnly?.checked;
+  const includeInactive = !!els.reminderIncludeInactive?.checked;
 
   const balances = calcFamilyBalances();
   const fams = state.families.slice();
@@ -1489,7 +1573,9 @@ function buildReminderRecipients() {
   const list = [];
 
   for (const f of fams) {
-    if (activeOnly && !f.active) continue;
+    // --- Active/inactive filter (UI flags) ---
+    // If user wants "only active", exclude inactive (unless includeInactive explicitly)
+    if (!includeInactive && activeOnly && !f.active) continue;
 
     const bal = balances.get(f.id) || 0;
     const due = dueCents(bal);
@@ -1498,6 +1584,17 @@ function buildReminderRecipients() {
     const emails = [f.email, f.email2].map(e => String(e || "").trim()).filter(isValidEmail);
     if (emails.length === 0) continue;
 
+    // =========================================================
+    // ✅ KEY CHANGE: filter depends on template kind
+    // =========================================================
+
+    if (kind === "overview") {
+      // "Budget/Overview" email: show ALL families (with email), regardless of due/balance
+      list.push({ f, bal });
+      continue;
+    }
+
+    // kind === "reminder": only families who are under target OR negative (depending on mode)
     if (mode === "negative_only") {
       if (bal < 0) list.push({ f, bal });
       continue;
@@ -1512,8 +1609,14 @@ function buildReminderRecipients() {
     }
   }
 
-  // sort: biggest due/most negative first
+  // sort
   list.sort((a, b) => {
+    // For overview: sort by name
+    if (kind === "overview") {
+      return familyDisplayName(a.f).localeCompare(familyDisplayName(b.f));
+    }
+
+    // For reminder: biggest due/most negative first
     const aScore = state.targetCents > 0 ? dueCents(a.bal) : Math.abs(Math.min(0, a.bal));
     const bScore = state.targetCents > 0 ? dueCents(b.bal) : Math.abs(Math.min(0, b.bal));
     return (bScore - aScore) || familyDisplayName(a.f).localeCompare(familyDisplayName(b.f));
@@ -1525,8 +1628,11 @@ function buildReminderRecipients() {
 function renderReminderList() {
   if (!els.reminderList) return;
 
-  const template = els.reminderTemplate?.value || defaultReminderTemplate();
-  const subject = els.reminderSubject?.value || defaultReminderSubject();
+  const kind = currentReminderTemplateKind();
+  const template =
+    (els.reminderTemplate?.value || "").trim() || defaultTemplateForKind(kind);
+  const subject =
+    (els.reminderSubject?.value || "").trim() || defaultSubjectForKind(kind);
 
   els.reminderList.innerHTML = "";
 
@@ -1538,30 +1644,52 @@ function renderReminderList() {
     left.className = "reminderRow__left";
 
     const title = document.createElement("div");
+    title.className = "reminderRow__title";
     title.style.fontWeight = "800";
-    const emailsShown = [it.f.email, it.f.email2].filter(Boolean).join(" · ");
-    title.textContent = `${familyDisplayName(it.f)} · ${emailsShown}`;
+    title.textContent = familyDisplayName(it.f);
+
+    const emailsTooltip = [it.f.email, it.f.email2]
+      .map(e => String(e || "").trim())
+      .filter(Boolean)
+      .join(" · ");
+    if (emailsTooltip) title.title = emailsTooltip;
 
     const meta = document.createElement("div");
     meta.className = "muted small";
     const due = dueCents(it.bal);
     meta.textContent =
       state.targetCents > 0
-        ? `${state.lang === "de" ? "Saldo" : "Balance"}: ${formatEUR(it.bal)} · ${state.lang === "de" ? "Fehlt" : "Due"}: ${formatEUR(due)}`
+        ? `${state.lang === "de" ? "Saldo" : "Balance"}: ${formatEUR(it.bal)} · ${
+            state.lang === "de" ? "Fehlt" : "Due"
+          }: ${formatEUR(due)}`
         : `${state.lang === "de" ? "Saldo" : "Balance"}: ${formatEUR(it.bal)}`;
 
     left.appendChild(title);
     left.appendChild(meta);
 
-    const btn = document.createElement("button");
-    btn.className = "btn btn--primary";
-    btn.type = "button";
-    btn.textContent = state.lang === "de" ? "Öffnen" : "Open";
-    btn.addEventListener("click", () => {
+    const btnWrap = document.createElement("div");
+    btnWrap.className = "reminderRow__buttons";
+
+    const openBtn = document.createElement("button");
+    openBtn.className = "btn btn--primary";
+    openBtn.type = "button";
+    openBtn.textContent = state.lang === "de" ? "Mail öffnen" : "Open mail";
+    openBtn.addEventListener("click", () => {
       reminderCursor = idx;
       openCurrentReminder(subject, template);
-      renderReminderList(); // refresh highlight
+      renderReminderList();
     });
+
+    const reportBtn = document.createElement("button");
+    reportBtn.className = "btn";
+    reportBtn.type = "button";
+    reportBtn.textContent = state.lang === "de" ? "Report / PDF" : "Report / PDF";
+    reportBtn.addEventListener("click", () => {
+      openFamilyReport(it.f.id);
+    });
+
+    btnWrap.appendChild(openBtn);
+    btnWrap.appendChild(reportBtn);
 
     if (idx === reminderCursor) {
       row.style.outline = "2px solid var(--stroke)";
@@ -1575,7 +1703,7 @@ function renderReminderList() {
     row.style.justifyContent = "space-between";
     row.style.gap = "12px";
     row.appendChild(left);
-    row.appendChild(btn);
+    row.appendChild(btnWrap);
 
     els.reminderList.appendChild(row);
   });
@@ -1587,6 +1715,7 @@ function renderReminderList() {
         : `${reminderRecipients.length} recipients`;
   }
 }
+
 
 function openCurrentReminder(subject, template) {
   const it = reminderRecipients[reminderCursor];
@@ -1610,12 +1739,14 @@ function openCurrentReminder(subject, template) {
 function openReminderDialog() {
   if (!els.reminderDialog) return;
 
+  const kind = currentReminderTemplateKind();
+
   // Defaults if empty
   if (els.reminderSubject && !String(els.reminderSubject.value || "").trim()) {
-    els.reminderSubject.value = defaultReminderSubject();
+    els.reminderSubject.value = defaultSubjectForKind(kind);
   }
   if (els.reminderTemplate && !String(els.reminderTemplate.value || "").trim()) {
-    els.reminderTemplate.value = defaultReminderTemplate();
+    els.reminderTemplate.value = defaultTemplateForKind(kind);
   }
 
   reminderRecipients = buildReminderRecipients();
@@ -1898,7 +2029,13 @@ function renderFamilies() {
   if (!els.familiesList) return;
   const { byFamily } = calcBalances();
 
-  const fams = state.families.slice().sort((a, b) => familyDisplayName(a).localeCompare(familyDisplayName(b)));
+  const filter = state.familyListFilter || { showActive: true, showInactive: false };
+
+  const fams = state.families
+    .filter((f) => (f.active && filter.showActive) || (!f.active && filter.showInactive))
+    .slice()
+    .sort((a, b) => familyDisplayName(a).localeCompare(familyDisplayName(b)));
+
   els.familiesList.innerHTML = "";
 
   if (fams.length === 0) {
@@ -1943,7 +2080,7 @@ function renderFamilies() {
     meta.appendChild(name);
     meta.appendChild(small);
 
-    // NEW: click on family -> open report popup
+    // click on family -> open report popup
     meta.style.cursor = "pointer";
     meta.addEventListener("click", () => openFamilyReport(f.id));
 
@@ -2628,6 +2765,10 @@ function renderAll() {
   applyLangVisibility(); // controls SEO+FAQ blocks
   applyTheme();
 
+  const filter = state.familyListFilter || { showActive: true, showInactive: false };
+  if (els.showActiveFamilies) els.showActiveFamilies.checked = !!filter.showActive;
+  if (els.showInactiveFamilies) els.showInactiveFamilies.checked = !!filter.showInactive;
+
   if (els.lang) els.lang.value = state.lang;
   if (els.theme) els.theme.value = state.theme;
 
@@ -2701,7 +2842,7 @@ if (els.expenseAmount) {
   });
 }
 
-/** Add Family wiring (FIX) */
+/** Add Family wiring */
 if (els.addFamilyBtn) {
   els.addFamilyBtn.addEventListener("click", addFamilyFromForm);
 }
@@ -2729,6 +2870,24 @@ if (els.expenseModeAll) {
 if (els.expenseModeCustom) {
   els.expenseModeCustom.addEventListener("change", () => {
     if (els.expenseModeCustom.checked) setExpenseMode("custom");
+  });
+}
+
+// family overview list
+if (els.showActiveFamilies) {
+  els.showActiveFamilies.addEventListener("change", (e) => {
+    state.familyListFilter = state.familyListFilter || { showActive: true, showInactive: false };
+    state.familyListFilter.showActive = !!e.target.checked;
+    saveState();
+    renderFamilies();
+  });
+}
+if (els.showInactiveFamilies) {
+  els.showInactiveFamilies.addEventListener("change", (e) => {
+    state.familyListFilter = state.familyListFilter || { showActive: true, showInactive: false };
+    state.familyListFilter.showInactive = !!e.target.checked;
+    saveState();
+    renderFamilies();
   });
 }
 
@@ -2807,6 +2966,18 @@ if (els.reminderDialog) {
   els.reminderDialog.addEventListener("click", (e) => {
     if (e.target === els.reminderDialog) closeReminderDialog();
   });
+}
+
+if (els.reminderTemplateKind) {
+  els.reminderTemplateKind.addEventListener("change", () => {
+    const kind = currentReminderTemplateKind();
+    els.reminderSubject.value = defaultSubjectForKind(kind);
+    els.reminderTemplate.value = defaultTemplateForKind(kind);
+    refreshReminderDialog();
+  });
+}
+if (els.reminderIncludeInactive) {
+  els.reminderIncludeInactive.addEventListener("change", refreshReminderDialog);
 }
 
 // Refresh list when criteria changes
