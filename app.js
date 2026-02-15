@@ -1913,7 +1913,8 @@ function renderFamilies() {
     const bal = byFamily.get(f.id) || 0;
 
     const card = document.createElement("div");
-    card.className = "familyCard";
+    card.className = "familyCard" + (f.active ? "" : " isInactive");
+    card.setAttribute("aria-disabled", f.active ? "false" : "true");
 
     const top = document.createElement("div");
     top.className = "familyTop";
@@ -1959,7 +1960,7 @@ function renderFamilies() {
     actions.className = "familyActions";
 
     const toggle = document.createElement("button");
-    toggle.className = "btn";
+    toggle.className = "btn toggleActiveBtn " + (f.active ? "isDeactivate" : "isActivate");
     toggle.type = "button";
     toggle.textContent = f.active
       ? state.lang === "de"
