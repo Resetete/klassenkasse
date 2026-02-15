@@ -1484,51 +1484,63 @@ function defaultOverviewSubject() {
 function defaultOverviewTemplate() {
   if (state.lang === "de") {
     return [
-      "Hallo {{parents}},",
+      "Liebe {{parents}},",
       "",
       "hier ist eine kurze Kontostandsübersicht zur Klassenkasse:",
       "Aktueller Saldo: {{balance}}",
       state.targetCents > 0 ? "Ziel: {{target}} · Fehlt noch: {{due}}" : "",
       "",
-      "Wenn du eine ausführliche Buchungsübersicht brauchst: Ich kann sie dir gerne als PDF senden.",
+      "Im Anhang ist eine ausführliche Buchungsübersicht als PDF.",
       "",
       "Liebe Grüße",
     ].filter(Boolean).join("\n");
   }
 
   return [
-    "Hi {{parents}},",
+    "Dear {{parents}},",
     "",
-    "here’s a quick account overview for the class fund:",
+    "Please find below a short overview of the class fund account:",
     "Current balance: {{balance}}",
-    state.targetCents > 0 ? "Target: {{target}} · Due: {{due}}" : "",
+    state.targetCents > 0 ? "Target: {{target}} · Outstanding amount: {{due}}" : "",
     "",
-    "If you need a detailed transaction report: I can send it as a PDF.",
+    "A detailed transaction overview is attached as a PDF.",
     "",
-    "Best regards",
+    "Kind regards",
   ].filter(Boolean).join("\n");
 }
 
 function defaultReminderTemplate() {
   if (state.lang === "de") {
     return [
-      "Hallo {{parents}},",
+      "Liebe {{parents}},",
       "",
-      "kurze Erinnerung zur Klassenkasse:",
-      "Aktueller Stand: {{balance}}",
-      state.targetCents > 0 ? "Ziel: {{target}} · Fehlt noch: {{due}}" : "",
+      "eine kleine Erinnerung zur Klassenkasse",
       "",
-      "Danke & liebe Grüße",
+      "Aktueller Kontostand: {{balance}}",
+      state.targetCents > 0
+        ? "Wir streben als gemeinsames Klassenguthaben {{target}} an. Aktuell fehlen noch {{due}}."
+        : "",
+      "",
+      "Die Klassenkasse hilft uns, Ausflüge, Materialien und gemeinsame Aktivitäten unkompliziert zu finanzieren.",
+      "Vielen Dank für die Unterstützung!",
+      "",
+      "Liebe Grüße",
     ].filter(Boolean).join("\n");
   }
   return [
-    "Hi {{parents}},",
+   "Dear {{parents}},",
     "",
-    "quick reminder about the class fund:",
+    "Just a quick reminder about the class fund.",
+    "",
     "Current balance: {{balance}}",
-    state.targetCents > 0 ? "Target: {{target}} · Due: {{due}}" : "",
+    state.targetCents > 0
+      ? "Our goal for the class fund is {{target}}. Currently, {{due}} is still missing."
+      : "",
     "",
-    "Thank you!",
+    "The class fund helps us cover trips, materials and shared activities easily.",
+    "Thanks a lot for your support!",
+    "",
+    "Kind regards",
   ].filter(Boolean).join("\n");
 }
 
@@ -1550,9 +1562,9 @@ function applyTemplate(template, family, balanceCents) {
 }
 
 function buildReminderRecipients() {
-  const mode = els.reminderMode?.value || "below_target";
+  const kind = currentReminderTemplateKind(); // "reminder" | "overview"
+  const mode = els.reminderMode?.value || "below_target"; // "below_target" | "negative_only"
   const activeOnly = !!els.reminderActiveOnly?.checked;
-
   const includeInactive = !!els.reminderIncludeInactive?.checked;
 
   const balances = calcFamilyBalances();
@@ -1561,6 +1573,8 @@ function buildReminderRecipients() {
   const list = [];
 
   for (const f of fams) {
+    // --- Active/inactive filter (UI flags) ---
+    // If user wants "only active", exclude inactive (unless includeInactive explicitly)
     if (!includeInactive && activeOnly && !f.active) continue;
 
     const bal = balances.get(f.id) || 0;
@@ -1570,6 +1584,17 @@ function buildReminderRecipients() {
     const emails = [f.email, f.email2].map(e => String(e || "").trim()).filter(isValidEmail);
     if (emails.length === 0) continue;
 
+    // =========================================================
+    // ✅ KEY CHANGE: filter depends on template kind
+    // =========================================================
+
+    if (kind === "overview") {
+      // "Budget/Overview" email: show ALL families (with email), regardless of due/balance
+      list.push({ f, bal });
+      continue;
+    }
+
+    // kind === "reminder": only families who are under target OR negative (depending on mode)
     if (mode === "negative_only") {
       if (bal < 0) list.push({ f, bal });
       continue;
@@ -1584,8 +1609,14 @@ function buildReminderRecipients() {
     }
   }
 
-  // sort: biggest due/most negative first
+  // sort
   list.sort((a, b) => {
+    // For overview: sort by name
+    if (kind === "overview") {
+      return familyDisplayName(a.f).localeCompare(familyDisplayName(b.f));
+    }
+
+    // For reminder: biggest due/most negative first
     const aScore = state.targetCents > 0 ? dueCents(a.bal) : Math.abs(Math.min(0, a.bal));
     const bScore = state.targetCents > 0 ? dueCents(b.bal) : Math.abs(Math.min(0, b.bal));
     return (bScore - aScore) || familyDisplayName(a.f).localeCompare(familyDisplayName(b.f));
@@ -1613,9 +1644,15 @@ function renderReminderList() {
     left.className = "reminderRow__left";
 
     const title = document.createElement("div");
+    title.className = "reminderRow__title";
     title.style.fontWeight = "800";
-    const emailsShown = [it.f.email, it.f.email2].filter(Boolean).join(" · ");
-    title.textContent = `${familyDisplayName(it.f)} · ${emailsShown}`;
+    title.textContent = familyDisplayName(it.f);
+
+    const emailsTooltip = [it.f.email, it.f.email2]
+      .map(e => String(e || "").trim())
+      .filter(Boolean)
+      .join(" · ");
+    if (emailsTooltip) title.title = emailsTooltip;
 
     const meta = document.createElement("div");
     meta.className = "muted small";
@@ -1631,9 +1668,7 @@ function renderReminderList() {
     left.appendChild(meta);
 
     const btnWrap = document.createElement("div");
-    btnWrap.style.display = "flex";
-    btnWrap.style.gap = "8px";
-    btnWrap.style.flexShrink = "0";
+    btnWrap.className = "reminderRow__buttons";
 
     const openBtn = document.createElement("button");
     openBtn.className = "btn btn--primary";

@@ -532,6 +532,36 @@ html[data-theme="paper"] .categoryOverview{ background: rgba(255,255,255,.65); }
   display:grid;
   gap:10px;
 }
+/* Reminder list: prevent long emails from overlapping buttons */
+.reminderRow {
+  white-space: normal;          /* allow wrapping */
+  overflow-wrap: anywhere;      /* allow break at safe points */
+  word-break: break-word;
+}
+
+.reminderRow__left {
+  flex: 1;
+  min-width: 0; /* IMPORTANT: enables ellipsis inside flex item */
+}
+
+.reminderRow__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reminderRow .muted.small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reminderRow__buttons {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+}
+
 html[data-theme="paper"] .reminderList{ background: rgba(255,255,255,.75); }
 .remItem{
   border:1px solid var(--stroke);
@@ -1343,4 +1373,59 @@ dialog.dialog{
   dialog.dialog{
     padding-bottom: calc(14px + env(safe-area-inset-bottom));
   }
+}
+
+
+/* ClassFund Tooltip (emails) */
+.cfTooltip{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: rgba(255,255,255,.06);
+  color: var(--muted);
+  font-weight: 900;
+  font-size: 12px;
+  cursor: help;
+  flex: 0 0 auto;
+}
+
+.cfTooltip::after{
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%) translateY(4px);
+  opacity: 0;
+  pointer-events: none;
+
+  max-width: 340px;
+  width: max-content;
+  padding: 10px 12px;
+  border-radius: 12px;
+
+  background: rgba(0,0,0,.85);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 14px 40px rgba(0,0,0,.35);
+
+  font-size: 12px;
+  line-height: 1.35;
+
+  /* wichtig für lange emails */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+
+  z-index: 9999;
+}
+
+.cfTooltip:hover::after,
+.cfTooltip:focus::after{
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
