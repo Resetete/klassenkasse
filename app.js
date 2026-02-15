@@ -93,6 +93,8 @@ const I18N = {
       familyHint: "Tipp: Inaktive Familien werden aus Auswahlfeldern ausgeschlossen, bleiben aber in der Historie.",
 
       familiesTitle: "Familien",
+      showActiveFamilies: "Aktive Familien",
+      showInactiveFamilies: 'Inaktive Familien',
       ledgerTitle: "Buchungsverlauf",
       ledgerHistoryHint: "Liste aller Ein- und Ausgaben",
       emptyState: "Noch keine Buchungen.",
@@ -247,6 +249,8 @@ const I18N = {
       familyHint: "Tip: inactive families are excluded from selections, but remain in history.",
 
       familiesTitle: "Families",
+      showActiveFamilies: "Active Families",
+      showInactiveFamilies: 'Inactive Families',
       ledgerTitle: "History of transactions",
       ledgerHistoryHint: "List of all deposits and expenses",
       emptyState: "No transactions yet.",
@@ -517,6 +521,10 @@ function defaultState() {
     // needed to filter or group categories by school year
     schoolYearFromISO: null,
     schoolYearToISO: null,
+    familyListFilter: {
+      showActive: true,
+      showInactive: false,
+    },
   };
 }
 
@@ -561,6 +569,13 @@ function loadState() {
 
     const expenseSelectMode = parsed.expenseSelectMode === "custom" ? "custom" : "all";
 
+    const familyListFilter = parsed.familyListFilter && typeof parsed.familyListFilter === "object"
+      ? {
+          showActive: parsed.familyListFilter.showActive !== false, // default true
+          showInactive: !!parsed.familyListFilter.showInactive,     // default false
+        }
+      : { showActive: true, showInactive: false };
+
     return {
       ...base,
       ...parsed,
@@ -569,6 +584,7 @@ function loadState() {
       targetCents,
       expenseSelectMode,
       categories,
+      familyListFilter,
       families: families.map((f) => ({
         id: f.id || uid(),
         parent1: typeof f.parent1 === "string" ? f.parent1.slice(0, 60) : "",
@@ -640,6 +656,10 @@ const els = {
   familiesCount: document.getElementById("familiesCount"),
   txCount: document.getElementById("txCount"),
 
+  // Family overview cards
+  showActiveFamilies: document.getElementById("showActiveFamilies"),
+  showInactiveFamilies: document.getElementById("showInactiveFamilies"),
+
   // settings
   targetAmount: document.getElementById("targetAmount"),
   schoolYearFrom: document.getElementById("schoolYearFrom"),
@@ -673,6 +693,7 @@ const els = {
   cancelReset: document.getElementById("cancelReset"),
   confirmReset: document.getElementById("confirmReset"),
 
+  // deposits
   depositDate: document.getElementById("depositDate"),
   depositFamily: document.getElementById("depositFamily"),
   depositAmount: document.getElementById("depositAmount"),
@@ -683,6 +704,7 @@ const els = {
   expenseCategory: document.getElementById("expenseCategory"),
   categoryOverview: document.getElementById("categoryOverview"),
 
+  // expenses
   expenseDate: document.getElementById("expenseDate"),
   expenseTitle: document.getElementById("expenseTitle"),
   expenseAmount: document.getElementById("expenseAmount"),
@@ -1898,7 +1920,13 @@ function renderFamilies() {
   if (!els.familiesList) return;
   const { byFamily } = calcBalances();
 
-  const fams = state.families.slice().sort((a, b) => familyDisplayName(a).localeCompare(familyDisplayName(b)));
+  const filter = state.familyListFilter || { showActive: true, showInactive: false };
+
+  const fams = state.families
+    .filter((f) => (f.active && filter.showActive) || (!f.active && filter.showInactive))
+    .slice()
+    .sort((a, b) => familyDisplayName(a).localeCompare(familyDisplayName(b)));
+
   els.familiesList.innerHTML = "";
 
   if (fams.length === 0) {
@@ -1943,7 +1971,7 @@ function renderFamilies() {
     meta.appendChild(name);
     meta.appendChild(small);
 
-    // NEW: click on family -> open report popup
+    // click on family -> open report popup
     meta.style.cursor = "pointer";
     meta.addEventListener("click", () => openFamilyReport(f.id));
 
@@ -2628,6 +2656,10 @@ function renderAll() {
   applyLangVisibility(); // controls SEO+FAQ blocks
   applyTheme();
 
+  const filter = state.familyListFilter || { showActive: true, showInactive: false };
+  if (els.showActiveFamilies) els.showActiveFamilies.checked = !!filter.showActive;
+  if (els.showInactiveFamilies) els.showInactiveFamilies.checked = !!filter.showInactive;
+
   if (els.lang) els.lang.value = state.lang;
   if (els.theme) els.theme.value = state.theme;
 
@@ -2701,7 +2733,7 @@ if (els.expenseAmount) {
   });
 }
 
-/** Add Family wiring (FIX) */
+/** Add Family wiring */
 if (els.addFamilyBtn) {
   els.addFamilyBtn.addEventListener("click", addFamilyFromForm);
 }
@@ -2729,6 +2761,24 @@ if (els.expenseModeAll) {
 if (els.expenseModeCustom) {
   els.expenseModeCustom.addEventListener("change", () => {
     if (els.expenseModeCustom.checked) setExpenseMode("custom");
+  });
+}
+
+// family overview list
+if (els.showActiveFamilies) {
+  els.showActiveFamilies.addEventListener("change", (e) => {
+    state.familyListFilter = state.familyListFilter || { showActive: true, showInactive: false };
+    state.familyListFilter.showActive = !!e.target.checked;
+    saveState();
+    renderFamilies();
+  });
+}
+if (els.showInactiveFamilies) {
+  els.showInactiveFamilies.addEventListener("change", (e) => {
+    state.familyListFilter = state.familyListFilter || { showActive: true, showInactive: false };
+    state.familyListFilter.showInactive = !!e.target.checked;
+    saveState();
+    renderFamilies();
   });
 }
 
