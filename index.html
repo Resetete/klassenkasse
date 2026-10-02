@@ -86,6 +86,11 @@
         </div>
 
         <div class="summary__item">
+          <div class="summary__label" data-i18n="bankOpening">Opening balance</div>
+          <div class="summary__value" id="bankOpening">0,00 €</div>
+        </div>
+
+        <div class="summary__item">
           <div class="summary__label" data-i18n="bankDeposits">Deposits (bank)</div>
           <div class="summary__value" id="bankDeposits">0,00 €</div>
         </div>
@@ -110,6 +115,14 @@
         </div>
         <p class="hint" data-i18n="targetHint">
           If set: each family should have at least this balance.
+        </p>
+
+        <div class="field" style="margin-top:16px;">
+          <label for="openingBalance" data-i18n="openingBalanceLabel">Opening balance of the account (€)</label>
+          <input id="openingBalance" type="text" inputmode="decimal" autocomplete="off" data-i18n-placeholder="phOpeningBalance" />
+        </div>
+        <p class="hint" data-i18n="openingBalanceHint">
+          Money that was already on the account before the first booking in this app.
         </p>
 
         <hr class="hr" />
