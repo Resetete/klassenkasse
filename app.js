@@ -1,5 +1,5 @@
 /* =========================================================
-   ClassFund / Klassenkasse — app.js (v1.3)
+   ClassFund / Klassenkasse — app.js (v1.4)
    ---------------------------------------------------------
    ✓ Backward compatible with existing exports
    ✓ Expense mode toggle:
@@ -41,6 +41,10 @@ const I18N = {
       targetAmountLabel: "Zielbetrag pro Kind (€)",
       phTargetAmount: "z. B. 25,00",
       targetHint: "Wenn gesetzt: Jedes Kind sollte mindestens diesen Saldo haben.",
+      openingBalanceLabel: "Anfangsbestand Konto (€)",
+      phOpeningBalance: "z. B. 120,00",
+      openingBalanceHint: "Kontostand, der schon vor der ersten Buchung in dieser App auf dem Konto war. Wird nur im Bankstand berücksichtigt, nicht bei den Kindern.",
+      bankOpening: "Anfangsbestand",
 
       depositTitle: "Einzahlung",
       dateLabel: "Datum",
@@ -58,7 +62,7 @@ const I18N = {
       schoolYearTitle: "Schuljahr",
       schoolYearFromLabel: "Schuljahr von",
       schoolYearToLabel: "Schuljahr bis",
-      schoolYearHint: "Kategorien-Summen werden nur für diesen Zeitraum berechnet.",
+      schoolYearHint: "Kategorien-Summen werden nur für diesen Zeitraum berechnet. Der Kontostand und die Kindersalden sind davon nicht betroffen (sie zählen immer alle Buchungen).",
 
       classExpenseTitle: "Klassen-Ausgabe aufteilen",
       expenseTitleLabel: "Titel",
@@ -197,11 +201,15 @@ const I18N = {
       targetAmountLabel: "Target amount per child (€)",
       phTargetAmount: "e.g. 25.00",
       targetHint: "If set: each child should have at least this balance.",
+      openingBalanceLabel: "Opening balance of the account (€)",
+      phOpeningBalance: "e.g. 120.00",
+      openingBalanceHint: "Money that was already on the account before the first booking in this app. Only counted in the bank balance, not per family.",
+      bankOpening: "Opening balance",
 
       schoolYearTitle: "School year",
       schoolYearFromLabel: "School year from",
       schoolYearToLabel: "School year until",
-      schoolYearHint: "Category totals are calculated only within this range.",
+      schoolYearHint: "Category totals are calculated only within this range. The bank balance and family balances are not affected (they always include all bookings).",
 
       depositTitle: "Contribution",
       dateLabel: "Date",
@@ -389,7 +397,11 @@ function uid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  // local date (toISOString() would use UTC and return "yesterday" shortly after midnight in DE)
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 function isValidEmail(v) {
   const s = String(v || "").trim();
@@ -411,10 +423,53 @@ function assertISODateOrEmpty(value, fieldLabel) {
   }
   return s;
 }
+/**
+ * Parses user input like "12,50", "12.50", "1.234,56", "1,234.56", "1 234,56 €" into integer cents.
+ * Returns null if invalid, 0 for empty input. Negative values are returned as negative cents.
+ * Uses string arithmetic (no float multiplication) to avoid rounding errors such as 1.005 * 100.
+ */
+function parseAmountToCents(v) {
+  let s = String(v ?? "").trim().replace(/[€\s\u00a0]/g, "");
+  if (!s) return 0;
+
+  let neg = false;
+  if (s.startsWith("-")) { neg = true; s = s.slice(1); }
+  else if (s.startsWith("+")) { s = s.slice(1); }
+
+  const isDe = normalizeLang(state?.lang) === "de";
+  const commas = (s.match(/,/g) || []).length;
+  const dots = (s.match(/\./g) || []).length;
+
+  if (commas > 0 && dots > 0) {
+    // both present: the one that appears last is the decimal separator
+    if (s.lastIndexOf(",") > s.lastIndexOf(".")) s = s.replace(/\./g, "").replace(",", ".");
+    else s = s.replace(/,/g, "");
+  } else if (commas > 0) {
+    const thousands = /^\d{1,3}(,\d{3})+$/.test(s);
+    if (commas > 1 || (thousands && !isDe)) s = s.replace(/,/g, "");
+    else s = s.replace(",", ".");
+  } else if (dots > 0) {
+    const thousands = /^\d{1,3}(\.\d{3})+$/.test(s);
+    if (thousands && (dots > 1 || isDe)) s = s.replace(/\./g, "");
+  }
+
+  const m = /^(\d+)(?:\.(\d*))?$/.exec(s);
+  if (!m || m[1].length > 12) return null;
+
+  const frac = m[2] || "";
+  let cents = parseInt(m[1], 10) * 100;
+  if (frac.length <= 2) cents += parseInt((frac + "00").slice(0, 2), 10);
+  else cents += Math.round(parseFloat("0." + frac) * 100);
+
+  return neg ? -cents : cents;
+}
 function centsFromInput(v) {
-  const n = Number(String(v || "").replace(",", "."));
-  if (!Number.isFinite(n) || n < 0) return null;
-  return Math.round(n * 100);
+  const c = parseAmountToCents(v);
+  if (c === null || c < 0) return null;
+  return c;
+}
+function centsFromSignedInput(v) {
+  return parseAmountToCents(v);
 }
 function centsFromPositiveInput(v) {
   const c = centsFromInput(v);
@@ -511,6 +566,7 @@ function defaultState() {
     lang: "en",
     theme: "minimal",
     targetCents: 0,
+    openingCents: 0, // opening balance of the bank account before the first booking in this app
     families: [],
     tx: [],
     expenses: [],
@@ -546,6 +602,18 @@ function categoryLabel(key) {
 
 let state = loadState();
 
+/**
+ * Legacy / unknown tx types: keep the historical behaviour (-> "deposit") so that old backups keep
+ * exactly their numbers. Only an untyped tx that is clearly linked to an existing expense becomes
+ * an allocation.
+ */
+function normalizeTxType(t, expenseIds) {
+  if (t?.type === "allocation") return "allocation";
+  if (t?.type === "deposit") return "deposit";
+  if (t?.expenseId && expenseIds && expenseIds.has(t.expenseId)) return "allocation";
+  return "deposit";
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -559,9 +627,12 @@ function loadState() {
     const targetCents =
       Number.isFinite(parsed.targetCents) && parsed.targetCents >= 0 ? parsed.targetCents : base.targetCents;
 
+    const openingCents = Number.isFinite(parsed.openingCents) ? Math.round(parsed.openingCents) : 0; // missing in old backups -> 0
+
     const families = Array.isArray(parsed.families) ? parsed.families : [];
     const tx = Array.isArray(parsed.tx) ? parsed.tx : [];
     const expenses = Array.isArray(parsed.expenses) ? parsed.expenses : [];
+    const expenseIdSet = new Set(expenses.map((e) => e && e.id).filter(Boolean));
 
     const categories = Array.isArray(parsed.categories)
       ? Array.from(new Set(parsed.categories.filter(Boolean).map(mapLegacyCategoryToKey)))
@@ -582,6 +653,7 @@ function loadState() {
       lang,
       theme,
       targetCents,
+      openingCents,
       expenseSelectMode,
       categories,
       familyListFilter,
@@ -601,7 +673,7 @@ function loadState() {
       })),
       tx: tx.map((t) => ({
         id: t.id || uid(),
-        type: t.type === "allocation" ? "allocation" : "deposit",
+        type: normalizeTxType(t, expenseIdSet),
         familyId: typeof t.familyId === "string" ? t.familyId : "",
         centsSigned: Number.isFinite(t.centsSigned) ? t.centsSigned : 0,
         dateISO: typeof t.dateISO === "string" ? t.dateISO : todayISO(),
@@ -634,8 +706,23 @@ function loadState() {
   }
 }
 
+let storageWarned = false;
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch (err) {
+    console.error("saveState failed:", err);
+    if (!storageWarned) {
+      storageWarned = true;
+      alert(
+        state.lang === "de"
+          ? "⚠️ Speichern im Browser nicht möglich (Speicher voll oder privater Modus). Bitte jetzt einen JSON-Export machen, sonst gehen Änderungen verloren."
+          : "⚠️ Could not save to browser storage (storage full or private mode). Please export a JSON backup now or your changes will be lost."
+      );
+    }
+    return false;
+  }
 }
 
 /** ---------- DOM ---------- **/
@@ -662,6 +749,7 @@ const els = {
 
   // settings
   targetAmount: document.getElementById("targetAmount"),
+  openingBalance: document.getElementById("openingBalance"),
   schoolYearFrom: document.getElementById("schoolYearFrom"),
   schoolYearTo: document.getElementById("schoolYearTo"),
 
@@ -965,8 +1053,18 @@ function calcBankTotals() {
     expenses += e.totalCents || 0;
   }
 
-  const balance = deposits - expenses;
-  return { deposits, expenses, balance };
+  const opening = Number.isFinite(state.openingCents) ? state.openingCents : 0;
+  const balance = opening + deposits - expenses;
+  return { opening, deposits, expenses, balance };
+}
+
+/** expenses total minus sum of all family allocations (should be 0) */
+function allocationMismatchCents() {
+  let alloc = 0;
+  for (const t of state.tx) if (t.type === "allocation") alloc += -(t.centsSigned || 0);
+  let exp = 0;
+  for (const e of state.expenses) exp += e.totalCents || 0;
+  return exp - alloc;
 }
 
 function calcFamilyBalances() {
@@ -981,29 +1079,32 @@ function calcFamilyBalances() {
 }
 
 function detectDuplicateBankEntries() {
-  const seen = new Set();
+  // returns one unique key per *extra* occurrence ("key#2", "key#3", ...)
+  const counts = new Map();
   const duplicates = [];
 
-  // Deposits
-  for (const t of state.tx.filter(t => t.type === "deposit")) {
-    const key = `D|${t.dateISO}|${t.centsSigned}|${t.note || ""}|${t.familyId}`;
-    if (seen.has(key)) duplicates.push(key);
-    seen.add(key);
+  const check = (key) => {
+    const n = (counts.get(key) || 0) + 1;
+    counts.set(key, n);
+    if (n >= 2) duplicates.push(`${key}#${n}`);
+  };
+
+  for (const t of state.tx) {
+    if (t.type !== "deposit") continue;
+    check(`D|${t.dateISO}|${t.centsSigned}|${t.note || ""}|${t.familyId}`);
   }
 
-  // Expenses
   for (const e of state.expenses) {
-    const key = `E|${e.dateISO}|${e.totalCents}|${e.title || ""}`;
-    if (seen.has(key)) duplicates.push(key);
-    seen.add(key);
+    check(`E|${e.dateISO}|${e.totalCents}|${e.title || ""}`);
   }
 
   return duplicates;
 }
 
-function isDuplicateDeposit(dateISO, cents, note) {
+function isDuplicateDeposit(dateISO, cents, note, familyId) {
   return state.tx.some(t =>
     t.type === "deposit" &&
+    t.familyId === familyId &&
     t.dateISO === dateISO &&
     t.centsSigned === cents &&
     (t.note || "") === (note || "")
@@ -1012,28 +1113,50 @@ function isDuplicateDeposit(dateISO, cents, note) {
 
 // Duplicates check
 let duplicateWarningShown = false;
+const DUP_ACK_KEY = "klassenkasse_dup_ack_v1";
 function warnIfDuplicatesOnce() {
   if (duplicateWarningShown) return;
   const dups = detectDuplicateBankEntries();
   if (dups.length === 0) return;
 
+  // only warn about duplicates the user has not been told about before
+  let acked = [];
+  try { acked = JSON.parse(localStorage.getItem(DUP_ACK_KEY) || "[]"); } catch { acked = []; }
+  if (!Array.isArray(acked)) acked = [];
+  const fresh = dups.filter((k) => !acked.includes(k));
+  if (fresh.length === 0) return;
+
   duplicateWarningShown = true;
+  try {
+    localStorage.setItem(DUP_ACK_KEY, JSON.stringify(Array.from(new Set([...acked, ...dups]))));
+  } catch { /* ignore */ }
+
   alert(
     state.lang === "de"
-      ? `⚠️ Achtung: ${dups.length} mögliche doppelte Bankbuchungen erkannt.`
-      : `⚠️ Warning: ${dups.length} possible duplicate bank entries detected.`
+      ? `⚠️ Achtung: ${fresh.length} mögliche doppelte Bankbuchung(en) erkannt. (Diese Meldung erscheint pro Doublette nur einmal.)`
+      : `⚠️ Warning: ${fresh.length} possible duplicate bank entries detected. (Shown only once per duplicate.)`
   );
-}
-
-function bankReconciliationStatus() {
-  const bank = calcBankTotals();
-  const status = bank.balance === 0 ? "ok" : "warn";
-  return { status, diff: bank.balance };
 }
 
 function buildBankCsvRows() {
   // Bank-relevant: deposits (tx deposit) + expenses (expenses list)
   const rows = [];
+
+  // Opening balance (so that the CSV sums up to the bank balance)
+  const opening = Number.isFinite(state.openingCents) ? state.openingCents : 0;
+  if (opening !== 0) {
+    rows.push({
+      kind: "OPENING",
+      dateISO: state.schoolYearFromISO || "",
+      amountEUR: eurNumber(opening),
+      note: state.lang === "de" ? "Anfangsbestand" : "Opening balance",
+      category: "",
+      family: "",
+      familyId: "",
+      id: "opening",
+      createdAt: "",
+    });
+  }
 
   // Deposits
   for (const t of state.tx) {
@@ -1068,7 +1191,7 @@ function buildBankCsvRows() {
   }
 
   // Sort by date desc, then createdAt desc
-  rows.sort((a, b) => (b.dateISO.localeCompare(a.dateISO) || (Number(b.createdAt) - Number(a.createdAt))));
+  rows.sort((a, b) => (String(b.dateISO || "").localeCompare(String(a.dateISO || "")) || (Number(b.createdAt) - Number(a.createdAt))));
 
   return rows;
 }
@@ -1093,53 +1216,6 @@ function downloadBankCsv() {
 
   const filename = `classfund-bank-${todayISO()}.csv`;
   downloadTextFile(filename, csv);
-}
-
-
-/** =========================================================
-DEBUG: find orphan / suspicious transactions
- ========================================================= */
-function debugFindSuspiciousTransactions() {
-  const familiesById = new Set(state.families.map(f => f.id));
-
-  const rows = state.tx.map(t => {
-    const familyExists = t.familyId && familiesById.has(t.familyId);
-
-    return {
-      id: t.id,
-      type: t.type,
-      date: t.dateISO,
-      centsSigned: t.centsSigned,
-      amountEUR: formatEUR(t.centsSigned),
-      familyId: t.familyId || "—",
-      familyExists,
-      note: t.note || "",
-      expenseId: t.expenseId || null,
-    };
-  });
-
-  const orphanTx = rows.filter(r => !r.familyExists);
-  const orphanSum = orphanTx.reduce((s, r) => s + r.centsSigned, 0);
-
-  console.group("🧪 ClassFund Debug — suspicious transactions");
-
-  console.log("All transactions:", rows.length);
-  console.log("Orphan transactions (missing family):", orphanTx.length);
-  console.log("Orphan total:", formatEUR(orphanSum));
-
-  if (orphanTx.length > 0) {
-    console.table(orphanTx);
-  } else {
-    console.log("✅ No orphan transactions found.");
-  }
-
-  console.groupEnd();
-
-  return {
-    orphanTx,
-    orphanSum,
-    totalTxCount: rows.length,
-  };
 }
 
 
@@ -1430,6 +1506,12 @@ function doImportFromPendingFile() {
       if (!candidate.lang) candidate.lang = state.lang || "en";
       if (!candidate.theme) candidate.theme = state.theme || "minimal";
 
+      // keep a safety copy of the current data before overwriting it
+      try {
+        const prev = localStorage.getItem(STORAGE_KEY);
+        if (prev) localStorage.setItem(STORAGE_KEY + "_backup_before_import", prev);
+      } catch { /* ignore */ }
+
       localStorage.setItem(STORAGE_KEY, JSON.stringify(candidate));
 
       state = loadState();
@@ -1437,10 +1519,20 @@ function doImportFromPendingFile() {
       expenseSelection.clear();
       renderAll();
 
-      setImportStatus(state.lang === "de" ? "Import erfolgreich." : "Import successful.", "ok");
-
-      // auto-close after short delay (UX-friendly)
-      setTimeout(() => closeImportDialog(), 500);
+      const mismatch = allocationMismatchCents();
+      if (mismatch !== 0) {
+        // do not auto-close: the user should read this
+        setImportStatus(
+          state.lang === "de"
+            ? `Import erfolgreich, aber: Ausgaben und Kinder-Zuteilungen weichen um ${formatEUR(mismatch)} voneinander ab. Bitte Ausgaben prüfen.`
+            : `Import successful, but expenses and family allocations differ by ${formatEUR(mismatch)}. Please check your expenses.`,
+          "warn"
+        );
+      } else {
+        setImportStatus(state.lang === "de" ? "Import erfolgreich." : "Import successful.", "ok");
+        // auto-close after short delay (UX-friendly)
+        setTimeout(() => closeImportDialog(), 500);
+      }
 
     } catch (e) {
       console.error("Import failed:", e);
@@ -1956,19 +2048,23 @@ function renderDepositFamilyPicker() {
   if (!els.depositFamily) return;
 
   const dateISO = (els.depositDate?.value || "").trim() || todayISO();
+  const previous = els.depositFamily.value;
 
+  // All families are bookable (late payments happen); not-eligible ones are marked and listed last.
+  const rank = (f) => (familyEligibleForDate(f, dateISO) ? 0 : 1);
   const fams = state.families
-    .filter((f) => familyEligibleForDate(f, dateISO))
     .slice()
-    .sort((a, b) => familyDisplayName(a).localeCompare(familyDisplayName(b)));
+    .sort((a, b) => (rank(a) - rank(b)) || familyDisplayName(a).localeCompare(familyDisplayName(b)));
 
   els.depositFamily.innerHTML = "";
   for (const f of fams) {
     const opt = document.createElement("option");
     opt.value = f.id;
-    opt.textContent = familyDisplayName(f);
+    const suffix = rank(f) === 0 ? "" : (state.lang === "de" ? " (nicht aktiv)" : " (not active)");
+    opt.textContent = familyDisplayName(f) + suffix;
     els.depositFamily.appendChild(opt);
   }
+  if (previous && fams.some((f) => f.id === previous)) els.depositFamily.value = previous;
 }
 
 /** ---------- Summary render ---------- **/
@@ -2003,12 +2099,12 @@ function renderSummary() {
     }
 
     // consistency check: bank.balance should equal total tx sum
-    const diff = bank.balance - total;
+    const diff = bank.balance - bank.opening - total;
     if (diff !== 0) {
       hints.push(
         state.lang === "de"
-          ? `⚠️ Abweichung: Bank-Saldo (${formatEUR(bank.balance)}) ≠ TX-Summe (${formatEUR(total)}). Diff: ${formatEUR(diff)}.`
-          : `⚠️ Mismatch: Bank balance (${formatEUR(bank.balance)}) ≠ TX sum (${formatEUR(total)}). Diff: ${formatEUR(diff)}.`
+          ? `⚠️ Abweichung: Bank-Saldo ohne Anfangsbestand (${formatEUR(bank.balance - bank.opening)}) ≠ Summe aller Buchungen (${formatEUR(total)}). Diff: ${formatEUR(diff)}.`
+          : `⚠️ Mismatch: Bank balance without opening balance (${formatEUR(bank.balance - bank.opening)}) ≠ sum of all bookings (${formatEUR(total)}). Diff: ${formatEUR(diff)}.`
       );
     }
 
@@ -2019,6 +2115,8 @@ function renderSummary() {
 function renderBankSummary() {
   const bank = calcBankTotals();
 
+  const openingEl = document.getElementById("bankOpening");
+  if (openingEl) openingEl.textContent = formatEUR(bank.opening);
   document.getElementById("bankDeposits").textContent = formatEUR(bank.deposits);
   document.getElementById("bankExpenses").textContent = formatEUR(bank.expenses);
   document.getElementById("bankBalance").textContent = formatEUR(bank.balance);
@@ -2240,6 +2338,25 @@ function renderTargetInput() {
   if (!els.targetAmount) return;
   els.targetAmount.value = state.targetCents ? String((state.targetCents / 100).toFixed(2)) : "";
 }
+function renderOpeningInput() {
+  if (!els.openingBalance) return;
+  // don't overwrite while the user is typing
+  if (document.activeElement === els.openingBalance) return;
+  els.openingBalance.value = state.openingCents
+    ? (state.openingCents / 100).toFixed(2).replace(".", state.lang === "de" ? "," : ".")
+    : "";
+}
+function updateOpeningFromInput() {
+  const c = centsFromSignedInput(els.openingBalance.value);
+  if (c === null) {
+    alert(state.lang === "de" ? "Ungültiger Betrag." : "Invalid amount.");
+    renderOpeningInput();
+    return;
+  }
+  state.openingCents = c;
+  saveState();
+  renderAll();
+}
 function updateTargetFromInput() {
   const c = centsFromInput(els.targetAmount.value);
   state.targetCents = c === null ? 0 : c;
@@ -2450,8 +2567,14 @@ function addDeposit() {
   if (!familyId) return alert(d.errors.familyMissing);
 
   const f = familyById(familyId);
-  if (!f || !familyEligibleForDate(f, dateISO)) {
-    return alert(state.lang === "de" ? "Familie ist für dieses Datum nicht aktiv." : "Family is not active for this date.");
+  if (!f) return alert(d.errors.familyMissing);
+  if (!familyEligibleForDate(f, dateISO)) {
+    const okInactive = confirm(
+      state.lang === "de"
+        ? "Familie ist für dieses Datum nicht aktiv. Einzahlung trotzdem buchen?"
+        : "Family is not active for this date. Book the deposit anyway?"
+    );
+    if (!okInactive) return;
   }
 
   const cents = centsFromPositiveInput(els.depositAmount?.value);
@@ -2460,7 +2583,7 @@ function addDeposit() {
   const note = String(els.depositNote?.value || "").trim().slice(0, 120);
   const category = ensureCategoryExists(els.depositCategory?.value);
 
-  if (isDuplicateDeposit(dateISO, cents, note)) {
+  if (isDuplicateDeposit(dateISO, cents, note, familyId)) {
     const ok = confirm(
       state.lang === "de"
         ? "Diese Einzahlung sieht identisch zu einer bestehenden aus. Trotzdem speichern?"
@@ -2554,14 +2677,22 @@ function editDepositPrompt(txId) {
   }
   const date = String(dateISO).trim();
 
-  const f = familyById(t.familyId);
-  const famName = familyDisplayName(f || {});
-  const familyOk = confirm(
-    (state.lang === "de"
-      ? `Familie beibehalten? (${famName})\n(OK = ja, Abbrechen = Auswahl per Dropdown in UI nicht möglich)`
-      : `Keep family? (${famName})\n(OK = yes, Cancel = no)`)
+  const famList = state.families
+    .slice()
+    .sort((a, b) => familyDisplayName(a).localeCompare(familyDisplayName(b)));
+  const curIdx = famList.findIndex((x) => x.id === t.familyId);
+  const listText = famList.map((x, i) => `${i + 1}) ${familyDisplayName(x)}`).join("\n");
+  const famAnswer = prompt(
+    (state.lang === "de" ? "Familie (Nummer eingeben):" : "Family (enter number):") + "\n" + listText,
+    curIdx >= 0 ? String(curIdx + 1) : ""
   );
-  if (!familyOk) return;
+  if (famAnswer === null) return;
+  const famIdx = parseInt(String(famAnswer).trim(), 10) - 1;
+  if (!(famIdx >= 0 && famIdx < famList.length)) {
+    alert(state.lang === "de" ? "Ungültige Auswahl." : "Invalid selection.");
+    return;
+  }
+  const f = famList[famIdx];
 
   if (f && !familyEligibleForDate(f, date)) {
     const ok = confirm(
@@ -2589,6 +2720,7 @@ function editDepositPrompt(txId) {
   if (cat === null) return;
   t.category = ensureCategoryExists(cat);
 
+  t.familyId = f.id;
   t.dateISO = date;
   t.centsSigned = cents;
 
@@ -2636,8 +2768,12 @@ function editExpensePrompt(expenseId) {
 
   // Participants bleiben wie sie sind, aber bei neuem Datum filtern wir un-eligible raus (mit Warnung).
   const oldIds = Array.isArray(e.participantIds) ? e.participantIds.slice() : [];
+  // Keep the existing participants (also families that were deactivated later!). Only when the date
+  // changes do we drop families that are not eligible for the new date. Missing families are dropped.
+  const dateChanged = dateISO !== e.dateISO;
+  const existingIds = new Set(state.families.map((f) => f.id));
   const eligibleSet = new Set(eligibleFamiliesForExpenseDate(dateISO).map((f) => f.id));
-  const newParticipantIds = oldIds.filter((id) => eligibleSet.has(id));
+  const newParticipantIds = oldIds.filter((id) => existingIds.has(id) && (!dateChanged || eligibleSet.has(id)));
 
   if (newParticipantIds.length === 0) {
     alert(state.lang === "de"
@@ -2678,6 +2814,8 @@ function deleteExpense(expenseId) {
 /** ---------- Export / Import / Reset ---------- **/
 function resetAllNow() {
   localStorage.removeItem(STORAGE_KEY);
+  try { localStorage.removeItem(DUP_ACK_KEY); } catch { /* ignore */ }
+  duplicateWarningShown = false;
   state = defaultState();
   saveState();
 
@@ -2776,6 +2914,7 @@ function renderAll() {
   if (els.expenseDate && !els.expenseDate.value) els.expenseDate.value = todayISO();
 
   renderTargetInput();
+  renderOpeningInput();
   renderSchoolYearInputs();
   renderDepositFamilyPicker();
   renderCategoryPickers();
@@ -2808,6 +2947,14 @@ if (els.targetAmount) {
   els.targetAmount.addEventListener("change", updateTargetFromInput);
   els.targetAmount.addEventListener("keydown", (e) => {
     if (e.key === "Enter") updateTargetFromInput();
+  });
+}
+
+if (els.openingBalance) {
+  els.openingBalance.addEventListener("change", updateOpeningFromInput);
+  els.openingBalance.addEventListener("keydown", (e) => {
+    // blur triggers the "change" event exactly once (avoids a double alert on invalid input)
+    if (e.key === "Enter") els.openingBalance.blur();
   });
 }
 
@@ -3172,8 +3319,10 @@ function toCsv(rows, headers, separator = ";") {
 }
 
 function eurNumber(cents) {
-  // for CSV: numeric string without currency symbol; DE uses comma, but Excel usually handles either.
-  return ((cents || 0) / 100).toFixed(2);
+  // for CSV: numeric string without currency symbol; decimal comma for DE
+  const s = ((cents || 0) / 100).toFixed(2);
+  // German Excel (separator ";") expects a decimal comma, otherwise "12.50" may become a date/text
+  return state.lang === "de" ? s.replace(".", ",") : s;
 }
 
 renderAll();
